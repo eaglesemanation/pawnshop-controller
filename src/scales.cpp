@@ -1,7 +1,9 @@
 #include "pawnshop/scales.hpp"
+#include "pawnshop/util.hpp"
 #include <regex>
 #include <iostream>
 #include <numeric>
+#include <chrono>
 
 namespace pawnshop {
 
@@ -39,21 +41,24 @@ std::optional<Scales::State> Scales::parse(const std::string line)
     return state;
 }
 
-double Scales::getWeight()
+std::optional<double> Scales::getWeight()
 {
     std::ifstream serial(serialPath);
     std::array<double, 20> measurements;
     auto measurementsIter = measurements.begin();
     while (true)
     {
-        std::string line;
-        std::getline(serial, line);
-        std::optional<Scales::State> state = parse(line);
-        if (state.has_value())
+        std::chrono::seconds timeout(10);
+        auto line = getline_timeout(serial, timeout);
+        if (!line) {
+            return {};
+        }
+        std::optional<Scales::State> state = parse(line.value());
+        if (state)
         {
             if (state->stable)
             {
-                *measurementsIter++ =  state->weight;
+                *measurementsIter++ = state->weight;
             }
         }
         if(measurementsIter == measurements.end()) {
@@ -66,6 +71,12 @@ double Scales::getWeight()
                 ) / (offset * 2);
         }
     }
+}
+
+bool Scales::poweredOn(std::chrono::duration<int> timeout) {
+    std::ifstream serial(serialPath);
+    auto line = getline_timeout(serial, timeout);
+    return line.has_value();
 }
 
 }

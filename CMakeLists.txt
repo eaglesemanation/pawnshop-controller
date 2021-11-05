@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 
+# Use vcpkg for libraries
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        CACHE STRING "")
+endif()
+
 project(
 	Pawnshop
 	VERSION 0.1.0
@@ -17,12 +23,6 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 	else()
 		message(STATUS "Doxygen not found, docs build skipped")
 	endif()
-
-    # Use vcpkg for libraries
-    if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-            CACHE STRING "")
-    endif()
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")

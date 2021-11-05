@@ -1,4 +1,8 @@
 add_executable(controller controller.cpp)
 
-target_compile_features(controller PRIVATE cxx_std_17)
-target_link_libraries(controller PRIVATE Gpiod::Gpiod PahoMqttCpp::paho-mqttpp3 pawnshop)
+set_target_properties(controller PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED YES
+    CXX_EXTENSIONS NO
+)
+target_link_libraries(controller PRIVATE Gpiod::Gpiod PahoMqttCpp::paho-mqttpp3-static pawnshop)

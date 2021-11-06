@@ -1,25 +1,20 @@
 #include "pawnshop/motor.hpp"
+
 #include <chrono>
 #include <cmath>
-#include <vector>
 #include <map>
+#include <vector>
 
 using namespace std::chrono_literals;
 
 namespace pawnshop {
 
-Motor::Motor(
-    gpiod::line clockLine,
-    gpiod::line dirLine,
-    bool inverted /* = false */
-) :
-    inverted(inverted)
-{
+Motor::Motor(gpiod::line clockLine, gpiod::line dirLine,
+             bool inverted /* = false */
+             )
+    : inverted(inverted) {
     static const gpiod::line_request outputReq = {
-        "pawnshop-motor",
-        gpiod::line_request::DIRECTION_OUTPUT,
-        0
-    };
+        "pawnshop-motor", gpiod::line_request::DIRECTION_OUTPUT, 0};
     clockLine.request(outputReq);
     this->clockLine = clockLine;
     dirLine.request(outputReq);
@@ -27,24 +22,22 @@ Motor::Motor(
     setDirection(POSITIVE);
 }
 
-Motor::Motor(
-    const gpiod::chip gpioChip,
-    const uint8_t clockLineOffset,
-    const uint8_t dirLineOffset,
-    bool inverted /* = false */
-) : Motor(gpioChip.get_line(clockLineOffset), gpioChip.get_line(dirLineOffset), inverted) {}
+Motor::Motor(const gpiod::chip gpioChip, const uint8_t clockLineOffset,
+             const uint8_t dirLineOffset, bool inverted /* = false */
+             )
+    : Motor(gpioChip.get_line(clockLineOffset),
+            gpioChip.get_line(dirLineOffset), inverted) {}
 
-Motor::Motor(Motor&& src) : 
-    clockLine(std::move(src.clockLine)),
-    dirLine(std::move(src.dirLine)),
-    dir(src.dir),
-    inverted(src.inverted),
-    stopped(src.stopped),
-    period(src.period.load())
-{}
+Motor::Motor(Motor&& src)
+    : clockLine(std::move(src.clockLine)),
+      dirLine(std::move(src.dirLine)),
+      dir(src.dir),
+      inverted(src.inverted),
+      stopped(src.stopped),
+      period(src.period.load()) {}
 
 int16_t Motor::step() const {
-    if(stopped) {
+    if (stopped) {
         return 0;
     }
     auto period = this->period.load();
@@ -56,7 +49,7 @@ int16_t Motor::step() const {
 }
 
 void Motor::setFrequency(const uint32_t hz) {
-    if(hz == 0) {
+    if (hz == 0) {
         stopped = true;
         return;
     }
@@ -66,7 +59,8 @@ void Motor::setFrequency(const uint32_t hz) {
 }
 
 int32_t Motor::getFrequency() const {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(1s) / period.load();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(1s) /
+           period.load();
 }
 
 void Motor::setPeriod(const std::chrono::nanoseconds period) {
@@ -78,8 +72,6 @@ void Motor::setDirection(Motor::Direction dir) {
     this->dir = dir;
 }
 
-Motor::Direction Motor::getDirection() const {
-    return dir;
-}
+Motor::Direction Motor::getDirection() const { return dir; }
 
-}
+}  // namespace pawnshop

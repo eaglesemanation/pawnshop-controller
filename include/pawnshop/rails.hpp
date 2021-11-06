@@ -3,8 +3,9 @@
 #include <array>
 #include <mutex>
 #include <shared_mutex>
-#include "vec.hpp"
+
 #include "axis.hpp"
+#include "vec.hpp"
 
 namespace pawnshop {
 
@@ -14,9 +15,10 @@ public:
     ~Rails() = default;
     void move(const pawnshop::vec::Vec3D newPos);
     pawnshop::vec::Vec3D getPos();
+
 private:
     void calibrate();
     std::array<Axis, 3> axes;
 };
 
-}
+}  // namespace pawnshop

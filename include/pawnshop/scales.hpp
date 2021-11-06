@@ -1,9 +1,9 @@
 #pragma once
+#include <chrono>
 #include <fstream>
-#include <string>
 #include <future>
 #include <optional>
-#include <chrono>
+#include <string>
 
 namespace pawnshop {
 
@@ -12,7 +12,9 @@ public:
     Scales(const std::string serialPath);
     virtual ~Scales();
     std::optional<double> getWeight();
-    bool poweredOn(std::chrono::duration<int> timeout = std::chrono::seconds(10));
+    bool poweredOn(
+        std::chrono::duration<int> timeout = std::chrono::seconds(10));
+
 private:
     std::string serialPath;
     struct State {
@@ -24,4 +26,4 @@ private:
     std::optional<State> parse(const std::string line);
 };
 
-}
+}  // namespace pawnshop

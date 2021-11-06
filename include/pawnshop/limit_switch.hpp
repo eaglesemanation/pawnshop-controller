@@ -16,8 +16,9 @@ public:
      * @returns True if limit switch reached
      */
     operator bool() const;
+
 private:
     gpiod::line line;
 };
 
-}
+}  // namespace pawnshop

@@ -1,4 +1,5 @@
 #include "pawnshop/util.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <fstream>
@@ -45,4 +46,4 @@ optional<string> getline_timeout(istream &is, duration<int> timeout) {
     }
 }
 
-}
+}  // namespace pawnshop

@@ -16,6 +16,7 @@ project(
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 	# Provides IDE's with information about folders
 	set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 	find_package(Doxygen)
 	if(Doxygen_FOUND)

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <map>
+#include <thread>
 #include <vector>
 
 using namespace std::chrono_literals;
@@ -68,7 +69,7 @@ void Motor::setPeriod(const std::chrono::nanoseconds period) {
 }
 
 void Motor::setDirection(Motor::Direction dir) {
-    dirLine.set_value((dir == POSITIVE ^ inverted) ? 1 : 0);
+    dirLine.set_value((dir == (POSITIVE ^ inverted)) ? 1 : 0);
     this->dir = dir;
 }
 

@@ -37,7 +37,7 @@ private:
     const double axisLength;
     const double stepLength;
     std::optional<LimitSwitch> negative;
-    std::timed_mutex positionMut;
+    std::shared_mutex positionMut;
     double position;
     void step(uint32_t steps);
     void setSpeed(double speed);

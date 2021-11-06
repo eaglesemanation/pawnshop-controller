@@ -15,7 +15,7 @@ namespace pawnshop {
 
 optional<string> getline_timeout(istream &is, duration<int> timeout) {
     timed_mutex mx;
-    atomic<bool> stopReading = false;
+    atomic<bool> stopReading{false};
     string line;
     line.reserve(128);
 

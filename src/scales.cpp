@@ -51,7 +51,7 @@ std::optional<double> Scales::getWeight() {
             return {};
         }
         std::optional<Scales::State> state = parse(line.value());
-        if (State) {
+        if (state) {
             if (state->stable) {
                 *measurementsIter++ = state->weight;
             }

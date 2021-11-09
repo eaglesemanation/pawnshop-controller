@@ -7,7 +7,7 @@ set_target_properties(controller PROPERTIES
 )
 target_link_libraries(controller
     PRIVATE
-    Gpiod::Gpiod
+    libgpiod::gpiod
     PahoMqttCpp::paho-mqttpp3-static
     nlohmann_json::nlohmann_json
     SQLite::SQLite3

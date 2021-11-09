@@ -2,7 +2,7 @@ file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${Pawnshop_SOURCE_DIR}/include/pawnshop
 file(GLOB SOURCE_LIST CONFIGURE_DEPENDS "*.cpp")
 set(DEPS_LIST
     atomic
-    Gpiod::Gpiod
+    libgpiod::gpiod
     SQLite::SQLite3
     doctest::doctest
     fmt::fmt

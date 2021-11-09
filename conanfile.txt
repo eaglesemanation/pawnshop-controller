@@ -1,5 +1,4 @@
 [requires]
-libgpiod/1.6.3
 nlohmann_json/3.10.4
 sqlite3/3.36.0
 paho-mqtt-cpp/1.2.0

@@ -27,8 +27,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     find_package(doctest)
 endif()
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 find_package(Threads REQUIRED)
-find_package(libgpiod REQUIRED)
+find_package(Gpiod REQUIRED)
 find_package(PahoMqttCpp REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(nlohmann_json REQUIRED)

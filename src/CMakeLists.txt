@@ -31,6 +31,11 @@ if(doctest_FOUND)
     add_executable(pawnshop_test tests/catch_main.cpp ${SOURCE_LIST})
     target_include_directories(pawnshop_test PUBLIC ../include)
     target_link_libraries(pawnshop_test PRIVATE ${DEPS_LIST})
+    set_target_properties(pawnshop_test PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+    )
 
     doctest_discover_tests(pawnshop_test
         ADD_LABELS YES)

@@ -1,11 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
 
-# Use vcpkg for libraries
-if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-        CACHE STRING "")
-endif()
-
 project(
 	Pawnshop
 	VERSION 0.1.0
@@ -14,6 +8,11 @@ project(
 
 # True if this project is main and not included with add_subdirectory
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    if(EXISTS "${CMAKE_BINARY_DIR}/conan_paths.cmake")
+        message(STATUS "Using conan for dependencies")
+        include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
+    endif()
+
 	# Provides IDE's with information about folders
 	set_property(GLOBAL PROPERTY USE_FOLDERS ON)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -24,13 +23,21 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 	else()
 		message(STATUS "Doxygen not found, docs build skipped")
 	endif()
+
+    find_package(doctest)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 find_package(Threads REQUIRED)
 find_package(Gpiod REQUIRED)
 find_package(PahoMqttCpp REQUIRED)
-find_package(OpenSSL REQUIRED)
+find_package(SQLite3 REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(fmt REQUIRED)
+
+include(CTest)
+include(doctest)
 
 add_subdirectory(src)
 add_subdirectory(apps)

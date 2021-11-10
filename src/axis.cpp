@@ -66,16 +66,11 @@ void Axis::move(const double newPos, const double scaling) {
     while (dir * (newPos - getPosition()) > SAccel) {
         std::this_thread::sleep_for(dt);
     }
-    std::cout << "Cur pos: " << getPosition()
-              << ", diff: " << dir * (newPos - getPosition())
-              << ", SAccel: " << SAccel << std::endl;
     // Deceleration
     while (dir * (newPos - getPosition()) > 0 && dir * (getSpeed() - v0) > 0) {
         setSpeed(getSpeed() - dv);
         std::this_thread::sleep_for(dt);
     }
-    std::cout << "Cur pos: " << getPosition()
-              << ", diff: " << dir * (newPos - getPosition()) << std::endl;
     stepping.join();
 }
 

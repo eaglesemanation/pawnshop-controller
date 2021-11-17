@@ -50,6 +50,8 @@ find_package(PahoMqttCpp REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(readerwriterqueue REQUIRED)
 
 include(CTest)
 include(doctest)

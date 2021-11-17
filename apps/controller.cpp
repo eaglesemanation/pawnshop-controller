@@ -1,112 +1,286 @@
 #include <mqtt/async_client.h>
+#include <mqtt/callback.h>
+#include <mqtt/iaction_listener.h>
+#include <mqtt/message.h>
+#include <readerwriterqueue/readerwriterqueue.h>
+#include <signal.h>
+#include <spdlog/spdlog.h>
 
+#include <array>
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <future>
 #include <gpiod.hpp>
-#include <iostream>
+#include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
+#include <pawnshop/mqtt_handler.hpp>
 #include <pawnshop/rails.hpp>
 #include <pawnshop/scales.hpp>
+#include <pawnshop/util.hpp>
 #include <thread>
 #include <vector>
 
 using namespace std::chrono_literals;
+using namespace std;
+using system_clock = std::chrono::system_clock;
 using namespace pawnshop;
 using namespace pawnshop::vec;
 using json = nlohmann::json;
 
-int main(int argc, char** argv) {
-    mqtt::async_client mqtt("tcp://lombardmat.local:1883", "controller");
-    auto mqttOptions = mqtt::connect_options_builder()
-                           .user_name("controller")
-                           .password("controller")
-                           .finalize();
-    mqtt.start_consuming();
-    auto mqttToken = mqtt.connect(mqttOptions);
+// begin of laser532 code here
+#define Ztop 150.0
+#define Zbtm 50.0
+#define Xcup 1.0
+#define Ycup 350.0
+#define Zcup 15
+#define Xscl 60.0
+#define Yscl 365.0
+#define Zscl 2
+#define Xus 320.0
+#define Yus 50.0
+#define Zus 70
+#define Xdr 120.0
+#define Ydr 35.0
+#define Zdr 45
+#define tdr 40s
+#define tus 15s
 
-    Scales scales("/dev/ttyS0");
+// end code of laser532
 
-    gpiod::chip gpioChip("/dev/gpiochip0");
-    // const std::array stepSizeLineOffsets { 22, 27, 17 };
-    Rails rails(
-        {//    len    steps   v_min v_max  accel                  cl  dir
-         //    inverted
-         Axis{435.0, 17250u, 30.0, 600.0, 100.0, Motor{gpioChip, 06, 13, true},
-              LimitSwitch{gpioChip, 25}},
-         Axis{530.0, 26750u, 30.0, 600.0, 100.0, Motor{gpioChip, 20, 16},
-              LimitSwitch{gpioChip, 5}},
-         Axis{150.0, 47000u, 30.0, 600.0, 100.0, Motor{gpioChip, 19, 26, true},
-              LimitSwitch{gpioChip, 12}}});
+// State machine with MQTT messages as events
+class Controller {
+    shared_ptr<mqtt::async_client> mqtt;
+    shared_ptr<MqttHandler::MessageQueue> incoming_messages;
 
-    // rails.move({435.0, 530.0, 150.0});
-    rails.move({400.0, 500.0, 150.0});
-    rails.move({0.0, 0.0, 0.0});
-    rails.move({5.0, 5.0, 5.0});
+    shared_ptr<atomic<bool>> interrupted;
 
-    // double netVolume, netWeight;
-    // {
-    //     rails.move({15900, 25000, 5000});
-    //     rails.move({15900, 25000, 1900});
-    //     rails.move({15900, 23000, 1900});
-    //     rails.move({15900, 23000, 20000});
+    unique_ptr<Scales> scales;
+    unique_ptr<Rails> rails;
 
-    //     rails.move({0, 21000, 47000});
-    //     rails.move({0, 21000, 1000});
-    //     rails.move({0, 21000, 25000});
-    //     double before = scales.getWeight();
-    //     rails.move({0, 21000, 1000});
-    //     std::this_thread::sleep_for(5s);
-    //     double laying = scales.getWeight();
-    //     rails.move({0, 21000, 15000});
-    //     std::this_thread::sleep_for(5s);
-    //     double floating = scales.getWeight();
-    //     netVolume = floating - before;
-    //     netWeight = laying - before;
-    //     rails.move({0, 21000, 47000});
+    unique_ptr<thread> reciever;
+    unique_ptr<thread> task;
 
-    //     rails.move({15900, 23000, 1900});
-    //     rails.move({15900, 25000, 1900});
-    //     rails.move({15900, 25000, 5000});
-    //     rails.move({0, 0, 0});
-    // }
+    enum State { IDLE, MEASURING, MOVING };
 
-    auto mqttResp = mqttToken->get_connect_response();
-    if (!mqttResp.is_session_present()) {
-        mqtt.subscribe("display.measurement", 1)->wait();
+    atomic<State> state = IDLE;
+    shared_ptr<condition_variable> state_cv;
+
+    void recieveMsg() {
+        while (!interrupted->load()) {
+            MqttMessage msg;
+            if (!incoming_messages->wait_dequeue_timed(msg, 1s)) continue;
+            if (state.load() == IDLE && task != nullptr) {
+                task->join();
+                task.reset();
+            }
+            try {
+                if (msg.topic == "PawnShop/controller/measure") {
+                    bool flag = msg.payload.get<bool>();
+                    if (state.load() == IDLE && flag) {
+                        task = make_unique<thread>(&Controller::measure, this);
+                        state = MEASURING;
+                    } else if (state.load() == MEASURING && !flag) {
+                        state = IDLE;
+                        state_cv->notify_all();
+                    }
+                } else if (msg.topic == "PawnShop/controller/move") {
+                    Vec3D pos = msg.payload.get<Vec3D>();
+                    spdlog::debug("Moving to (x: {:.1f}, y: {:.1f}, z: {:.1f})",
+                                  pos.at(0), pos.at(1), pos.at(2));
+                    if (state.load() == IDLE) {
+                        state = MOVING;
+                        rails->move(pos);
+                        state = IDLE;
+                    }
+                }
+            } catch (json::exception& e) {
+                spdlog::warn("Ill-formed message on topic \"{}\": {}",
+                             msg.topic, e.what());
+            }
+        }
     }
 
-    // while (true) {
-    //     auto msg = mqtt.consume_message();
-    //     if (!msg) break;
-    //     if(msg->get_topic() == "display.measurement") {
-    //         rails.move({15900, 25000, 5000});
-    //         rails.move({15900, 25000, 1900});
-    //         rails.move({15900, 23000, 1900});
-    //         rails.move({15900, 23000, 20000});
+    void measure() {
+        rails->move({0.0, 0.0, Ztop});
 
-    //         rails.move({0, 21000, 47000});
-    //         double before = scales.getWeight();
-    //         rails.move({0, 21000, 1000});
-    //         std::this_thread::sleep_for(5s);
-    //         double laying = scales.getWeight();
-    //         rails.move({0, 21000, 15000});
-    //         std::this_thread::sleep_for(5s);
-    //         double floating = scales.getWeight();
-    //         double objVolume = floating - before - netVolume;
-    //         double objWeight = laying - before - netWeight;
-    //         double objDensity = objWeight / objVolume;
-    //         json resp {
-    //             {"volume", objVolume},
-    //             {"weight", objWeight},
-    //             {"density", objDensity}
-    //         };
-    //         mqtt.publish("controller.density", resp.dump());
-    //         rails.move({0, 21000, 47000});
+        mqtt->publish("PawnShop/cmd", "FillUS");
 
-    //         rails.move({15900, 23000, 1900});
-    //         rails.move({15900, 25000, 1900});
-    //         rails.move({15900, 25000, 5000});
-    //         rails.move({0, 0, 0});
-    //     }
-    // }
+        if (!scales->poweredOn()) {
+            pressScalesButton();
+        }
+        std::optional<double> weight = scales->getWeight();
+
+        // permanent weight control while filling
+        double baseline_weight = weight.value();
+        if (baseline_weight < 40) mqtt->publish("PawnShop/cmd", "FillCup");
+
+        double caret_weight = scaleWeighting() - baseline_weight;
+
+        getCarret();
+        shakeZ();
+
+        double dirty_weight = scaleWeighting() - caret_weight - baseline_weight;
+
+        // washing
+        rails->move({Xus, Yus, Ztop});
+        rails->move({Xus, Yus, Zus});
+        std::this_thread::sleep_for(1s);
+        mqtt->publish("PawnShop/cmd", "US");
+        std::this_thread::sleep_for(tus);
+        mqtt->publish("PawnShop/cmd", "USoff");
+        // mqtt.publish("PawnShop/cmd", "Empty");
+        rails->move({Xus, Yus, Ztop});
+        std::this_thread::sleep_for(1s);
+
+        drying();
+
+        double clean_weight = scaleWeighting() - caret_weight - baseline_weight;
+
+        double submerged_weight = submergedWeighting() - baseline_weight - 0.81;
+
+        double density = clean_weight / submerged_weight;
+
+        mqtt->publish("PawnShop/report",
+                      json{{"baseline_weight", float(baseline_weight)},
+                           {"caret_weight", float(caret_weight)},
+                           {"dirty_weight", float(dirty_weight)},
+                           {"clean_weight", float(clean_weight)},
+                           {"volumetric_weight", float(submerged_weight)},
+                           {"density", float(density)}}
+                          .dump());
+
+        drying();
+
+        // go home
+        rails->move({0.0, 0.0, 50.0});
+
+        state = IDLE;
+    }
+
+    void getCarret() {
+        rails->move({400.0, 500.0, 150.0});
+        rails->move({400.0, 500.0, 150.0});
+    }
+
+    void pressScalesButton() {
+        rails->move({400.0, 500.0, 150.0});
+        rails->move({400.0, 515.0, 150.0});
+        std::this_thread::sleep_for(1s);
+        rails->move({400.0, 500.0, 150.0});
+        std::this_thread::sleep_for(1s);
+    }
+
+    void shakeZ() {
+        rails->move({400.0, 500.0, 0.0});
+        rails->move({400.0, 500.0, 150.0});
+        rails->move({400.0, 500.0, 0.0});
+        rails->move({400.0, 500.0, 80.0});
+    }
+
+    void drying() {
+        rails->move({Xdr, Ydr, Ztop});
+        rails->move({Xdr, Ydr, Zdr});
+        mqtt->publish("PawnShop/cmd", "Dry");
+        std::this_thread::sleep_for(tdr);
+        mqtt->publish("PawnShop/cmd", "SDry");
+        std::this_thread::sleep_for(1s);
+        rails->move({Xdr, Ydr, Ztop});
+    }
+
+    /**
+     * Measure object weight directly on scales
+     *
+     * @returns measured weight or 0 in case of failure
+     */
+    double scaleWeighting() {
+        rails->move({Xscl, Yscl, Ztop});
+        rails->move({Xscl, Yscl, Zscl});
+        auto weight = scales->getWeight();
+        rails->move({Xscl, Yscl, Ztop});
+        return weight.value_or(0);
+    }
+
+    /**
+     * Measure object weight submerged in cup
+     *
+     * @returns measured weight or 0 in case of failure
+     */
+    double submergedWeighting() {
+        rails->move({Xcup, Ycup, Ztop});
+        rails->move({Xcup, Ycup, Zcup});
+        auto weight = scales->getWeight();
+        rails->move({Xcup, Ycup, Ztop});
+        return weight.value_or(0);
+    }
+
+public:
+    Controller(shared_ptr<mqtt::async_client> mqtt,
+               shared_ptr<MqttHandler::MessageQueue> incoming_messages,
+               shared_ptr<atomic<bool>> interrupted)
+        : mqtt(mqtt),
+          incoming_messages(incoming_messages),
+          interrupted(interrupted) {
+        gpiod::chip gpio_chip{"/dev/gpiochip0"};
+        scales = make_unique<Scales>("/dev/ttyS0");
+        // const std::array stepSizeLineOffsets { 22, 27, 17 };
+        rails = make_unique<Rails>(array{
+            //   len    steps   v_min v_max  accel
+            Axis{435.0, 17250u, 30.0, 600.0, 100.0,
+                 //              cl  dir inverted
+                 Motor{gpio_chip, 06, 13, true}, LimitSwitch{gpio_chip, 25}},
+            Axis{530.0, 26750u, 30.0, 600.0, 100.0, Motor{gpio_chip, 20, 16},
+                 LimitSwitch{gpio_chip, 5}},
+            Axis{150.0, 94000u, 30.0, 600.0, 100.0,
+                 Motor{gpio_chip, 19, 26, true}, LimitSwitch{gpio_chip, 12}}});
+        reciever = make_unique<thread>(&Controller::recieveMsg, this);
+        state_cv = make_unique<condition_variable>();
+    }
+
+    ~Controller() {
+        state = IDLE;
+        state_cv->notify_all();
+
+        if (reciever) reciever->join();
+        if (task) task->join();
+
+        if (mqtt->is_connected()) mqtt->disconnect()->wait();
+    }
+};
+
+int main(int argc, char** argv) {
+    // Masks SIGINT and SIGTERM for all forked threads
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGINT);
+    sigaddset(&sigset, SIGTERM);
+    pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+
+    auto shutdown_requested = make_shared<atomic<bool>>(false);
+    auto shutdown_cv = make_shared<condition_variable>();
+
+    // Show all types of messages including debug
+    // If you want to hide debug messages - comment this line
+    spdlog::set_level(spdlog::level::debug);
+
+    auto mqtt = make_shared<mqtt::async_client>("tcp://lombardmat.local:1883",
+                                                "controller");
+    auto mqtt_options = mqtt::connect_options_builder()
+                            .user_name("controller")
+                            .password("controller")
+                            .finalize();
+    auto incoming_messages = make_shared<MqttHandler::MessageQueue>();
+    MqttHandler mqtt_handler(mqtt, mqtt_options, shutdown_requested,
+                             shutdown_cv, incoming_messages);
+    mqtt->set_callback(mqtt_handler);
+    mqtt->connect(mqtt_options, nullptr, mqtt_handler);
+
+    Controller controller(mqtt, incoming_messages, shutdown_requested);
+
+    int signum = 0;
+    sigwait(&sigset, &signum);
+    shutdown_requested->store(true);
+    shutdown_cv->notify_all();
+    spdlog::info("Recieved signal, terminating");
 }

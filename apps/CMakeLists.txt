@@ -10,5 +10,7 @@ target_link_libraries(controller
     Gpiod::Gpiod
     PahoMqttCpp::paho-mqttpp3-static
     nlohmann_json::nlohmann_json
-    SQLite::SQLite3
+    spdlog::spdlog
+    fmt::fmt
+    readerwriterqueue::readerwriterqueue
     pawnshop)

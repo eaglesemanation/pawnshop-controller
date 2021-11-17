@@ -6,6 +6,10 @@ set(DEPS_LIST
     SQLite::SQLite3
     doctest::doctest
     fmt::fmt
+    spdlog::spdlog
+    nlohmann_json::nlohmann_json
+    PahoMqttCpp::paho-mqttpp3-static
+    readerwriterqueue::readerwriterqueue
     ${CMAKE_THREAD_LIBS_INIT})
 
 add_library(pawnshop ${SOURCE_LIST} ${HEADER_LIST})

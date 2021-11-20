@@ -132,8 +132,7 @@ class Controller {
 
         double caret_weight = scaleWeighting() - baseline_weight;
 
-        getCarret();
-        shakeZ();
+        getGold();
 
         m.dirty_weight = scaleWeighting() - caret_weight - baseline_weight;
 
@@ -168,8 +167,9 @@ class Controller {
         state = IDLE;
     }
 
-    void getCarret() {
+    void getGold() {
         rails->move({400.0, 500.0, 150.0});
+        rails->move({400.0, 500.0, 50.0});
         rails->move({400.0, 500.0, 150.0});
     }
 
@@ -179,13 +179,6 @@ class Controller {
         std::this_thread::sleep_for(1s);
         rails->move({400.0, 500.0, 150.0});
         std::this_thread::sleep_for(1s);
-    }
-
-    void shakeZ() {
-        rails->move({400.0, 500.0, 0.0});
-        rails->move({400.0, 500.0, 150.0});
-        rails->move({400.0, 500.0, 0.0});
-        rails->move({400.0, 500.0, 80.0});
     }
 
     void drying() {

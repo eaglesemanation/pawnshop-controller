@@ -8,9 +8,38 @@
 using namespace std;
 using system_clock = std::chrono::system_clock;
 using seconds = std::chrono::seconds;
+using json = nlohmann::json;
 
 // TODO: Lots and lots of error handling
 namespace pawnshop {
+
+void to_json(json& j, const Measurement& m) {
+    j = {{"id", m.id},
+         {"product_id", m.product_id},
+         {"start_time", std::chrono::time_point_cast<seconds>(m.start_time)
+                            .time_since_epoch()
+                            .count()},
+         {"end_time", std::chrono::time_point_cast<seconds>(m.end_time)
+                          .time_since_epoch()
+                          .count()},
+         {"dirty_weight", m.dirty_weight},
+         {"clean_weight", m.clean_weight},
+         {"submerged_weight", m.submerged_weight},
+         {"density", m.density}};
+}
+
+void from_json(const nlohmann::json& j, Measurement& m) {
+    j.at("id").get_to(m.id);
+    j.at("product_id").get_to(m.product_id);
+    auto epoch = j.at("start_time").get<int64_t>();
+    m.start_time = system_clock::time_point{seconds{epoch}};
+    epoch = j.at("end_time").get<int64_t>();
+    m.end_time = system_clock::time_point{seconds{epoch}};
+    j.at("dirty_weight").get_to(m.dirty_weight);
+    j.at("clean_weight").get_to(m.clean_weight);
+    j.at("submerged_weight").get_to(m.submerged_weight);
+    j.at("density").get_to(m.density);
+}
 
 MeasurementDb::MeasurementDb(const string& db_path) {
     sqlite3_open_v2(db_path.c_str(), &db,

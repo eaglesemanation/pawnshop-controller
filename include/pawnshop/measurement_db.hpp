@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,9 @@ struct Measurement {
     double submerged_weight;
     double density;
 };
+
+void to_json(nlohmann::json& j, const Measurement& p);
+void from_json(const nlohmann::json& j, Measurement& p);
 
 class MeasurementDb {
 public:

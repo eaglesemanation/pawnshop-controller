@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <pawnshop/measurement_db.hpp>
 #include <pawnshop/mqtt_handler.hpp>
 #include <pawnshop/rails.hpp>
 #include <pawnshop/scales.hpp>
@@ -56,10 +57,12 @@ class Controller {
 
     shared_ptr<atomic<bool>> interrupted;
 
+    unique_ptr<MeasurementDb> db;
+
     unique_ptr<Scales> scales;
     unique_ptr<Rails> rails;
 
-    unique_ptr<thread> reciever;
+    unique_ptr<thread> receiver;
     unique_ptr<thread> task;
 
     enum State { IDLE, MEASURING, MOVING };
@@ -79,7 +82,9 @@ class Controller {
                 if (msg.topic == "PawnShop/controller/measure") {
                     bool flag = msg.payload.get<bool>();
                     if (state.load() == IDLE && flag) {
-                        task = make_unique<thread>(&Controller::measure, this);
+                        // TODO: Add "product_id" to message
+                        task =
+                            make_unique<thread>(&Controller::measure, this, 0);
                         state = MEASURING;
                     } else if (state.load() == MEASURING && !flag) {
                         state = IDLE;
@@ -102,7 +107,10 @@ class Controller {
         }
     }
 
-    void measure() {
+    void measure(int64_t product_id) {
+        Measurement m;
+        m.product_id = product_id;
+
         rails->move({0.0, 0.0, Ztop});
 
         mqtt->publish("PawnShop/cmd", "FillUS");
@@ -114,14 +122,20 @@ class Controller {
 
         // permanent weight control while filling
         double baseline_weight = weight.value();
-        if (baseline_weight < 40) mqtt->publish("PawnShop/cmd", "FillCup");
+        const double desired_weight = 40;
+        if (baseline_weight < desired_weight) {
+            mqtt->publish("PawnShop/cmd",
+                          json{{"cmd", "FillCup"},
+                               {"Value", desired_weight - baseline_weight}}
+                              .dump());
+        }
 
         double caret_weight = scaleWeighting() - baseline_weight;
 
         getCarret();
         shakeZ();
 
-        double dirty_weight = scaleWeighting() - caret_weight - baseline_weight;
+        m.dirty_weight = scaleWeighting() - caret_weight - baseline_weight;
 
         // washing
         rails->move({Xus, Yus, Ztop});
@@ -136,20 +150,15 @@ class Controller {
 
         drying();
 
-        double clean_weight = scaleWeighting() - caret_weight - baseline_weight;
+        m.clean_weight = scaleWeighting() - caret_weight - baseline_weight;
+        m.submerged_weight = submergedWeighting() - baseline_weight - 0.81;
+        m.density = m.clean_weight / m.submerged_weight;
 
-        double submerged_weight = submergedWeighting() - baseline_weight - 0.81;
+        // id generated on insertion
+        m.id = db->insert(m);
 
-        double density = clean_weight / submerged_weight;
-
-        mqtt->publish("PawnShop/report",
-                      json{{"baseline_weight", float(baseline_weight)},
-                           {"caret_weight", float(caret_weight)},
-                           {"dirty_weight", float(dirty_weight)},
-                           {"clean_weight", float(clean_weight)},
-                           {"volumetric_weight", float(submerged_weight)},
-                           {"density", float(density)}}
-                          .dump());
+        json payload = m;
+        mqtt->publish("PawnShop/report", payload.dump());
 
         drying();
 
@@ -234,7 +243,10 @@ public:
                  LimitSwitch{gpio_chip, 5}},
             Axis{150.0, 94000u, 30.0, 600.0, 100.0,
                  Motor{gpio_chip, 19, 26, true}, LimitSwitch{gpio_chip, 12}}});
-        reciever = make_unique<thread>(&Controller::recieveMsg, this);
+
+        db = make_unique<MeasurementDb>("measurements.sqlite3");
+
+        receiver = make_unique<thread>(&Controller::recieveMsg, this);
         state_cv = make_unique<condition_variable>();
     }
 
@@ -242,7 +254,7 @@ public:
         state = IDLE;
         state_cv->notify_all();
 
-        if (reciever) reciever->join();
+        if (receiver) receiver->join();
         if (task) task->join();
 
         if (mqtt->is_connected()) mqtt->disconnect()->wait();

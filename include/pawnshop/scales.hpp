@@ -16,7 +16,7 @@ public:
         std::chrono::duration<int> timeout = std::chrono::seconds(10));
 
 private:
-    std::string serialPath;
+    std::string serial_path;
     struct State {
         std::string unit;
         double weight;

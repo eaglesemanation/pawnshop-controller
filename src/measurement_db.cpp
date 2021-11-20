@@ -12,8 +12,8 @@ using seconds = std::chrono::seconds;
 // TODO: Lots and lots of error handling
 namespace pawnshop {
 
-MeasurementDb::MeasurementDb(const string& dbPath) {
-    sqlite3_open_v2(dbPath.c_str(), &db,
+MeasurementDb::MeasurementDb(const string& db_path) {
+    sqlite3_open_v2(db_path.c_str(), &db,
                     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     sqlite3_exec(db,
                  u8"CREATE TABLE IF NOT EXISTS measurements ("
@@ -38,21 +38,21 @@ MeasurementDb::~MeasurementDb() { sqlite3_close_v2(db); }
  */
 inline int64_t bindMeasurementValues(sqlite3_stmt* stmt, const Measurement& m,
                                      int64_t offset = 0) {
-    int64_t columnIdx = 1 + offset;
-    sqlite3_bind_double(stmt, columnIdx++, m.dirtyWeight);
-    sqlite3_bind_double(stmt, columnIdx++, m.cleanWeight);
-    sqlite3_bind_double(stmt, columnIdx++, m.submergedWeight);
-    sqlite3_bind_double(stmt, columnIdx++, m.density);
-    int64_t epoch = std::chrono::time_point_cast<seconds>(m.startTime)
+    int64_t column_idx = 1 + offset;
+    sqlite3_bind_double(stmt, column_idx++, m.dirty_weight);
+    sqlite3_bind_double(stmt, column_idx++, m.clean_weight);
+    sqlite3_bind_double(stmt, column_idx++, m.submerged_weight);
+    sqlite3_bind_double(stmt, column_idx++, m.density);
+    int64_t epoch = std::chrono::time_point_cast<seconds>(m.start_time)
                         .time_since_epoch()
                         .count();
-    sqlite3_bind_int64(stmt, columnIdx++, epoch);
-    epoch = std::chrono::time_point_cast<seconds>(m.endTime)
+    sqlite3_bind_int64(stmt, column_idx++, epoch);
+    epoch = std::chrono::time_point_cast<seconds>(m.end_time)
                 .time_since_epoch()
                 .count();
-    sqlite3_bind_int64(stmt, columnIdx++, epoch);
-    sqlite3_bind_int64(stmt, columnIdx++, m.productId);
-    return columnIdx;
+    sqlite3_bind_int64(stmt, column_idx++, epoch);
+    sqlite3_bind_int64(stmt, column_idx++, m.product_id);
+    return column_idx;
 }
 
 int64_t MeasurementDb::insert(const Measurement& m) {
@@ -78,8 +78,8 @@ void MeasurementDb::update(const Measurement& m) {
         u8"productId=$product WHERE rowid = $id",
         -1, &stmt, nullptr);
 
-    int64_t columnIdx = bindMeasurementValues(stmt, m);
-    sqlite3_bind_int64(stmt, columnIdx++, m.id);
+    int64_t column_idx = bindMeasurementValues(stmt, m);
+    sqlite3_bind_int64(stmt, column_idx++, m.id);
     sqlite3_step(stmt);
     sqlite3_finalize(stmt);
 }
@@ -87,15 +87,15 @@ void MeasurementDb::update(const Measurement& m) {
 inline Measurement getMeasurementRow(sqlite3_stmt* stmt) {
     Measurement m;
     m.id = sqlite3_column_int64(stmt, 0);
-    m.dirtyWeight = sqlite3_column_double(stmt, 1);
-    m.cleanWeight = sqlite3_column_double(stmt, 2);
-    m.submergedWeight = sqlite3_column_double(stmt, 3);
+    m.dirty_weight = sqlite3_column_double(stmt, 1);
+    m.clean_weight = sqlite3_column_double(stmt, 2);
+    m.submerged_weight = sqlite3_column_double(stmt, 3);
     m.density = sqlite3_column_double(stmt, 4);
     int64_t epoch = sqlite3_column_int64(stmt, 5);
-    m.startTime = system_clock::time_point{seconds{epoch}};
+    m.start_time = system_clock::time_point{seconds{epoch}};
     epoch = sqlite3_column_int64(stmt, 6);
-    m.endTime = system_clock::time_point{seconds{epoch}};
-    m.productId = sqlite3_column_int64(stmt, 7);
+    m.end_time = system_clock::time_point{seconds{epoch}};
+    m.product_id = sqlite3_column_int64(stmt, 7);
     return m;
 }
 
@@ -139,19 +139,19 @@ vector<Measurement> MeasurementDb::getAll() {
 }
 
 TEST_CASE("MeasurementsDB") {
-    string dbPath = "./testing.sqlite3";
-    auto db = new MeasurementDb(dbPath);
+    string db_path = "./testing.sqlite3";
+    auto db = new MeasurementDb(db_path);
 
     Measurement m;
-    m.startTime = std::chrono::time_point_cast<seconds>(system_clock::now());
+    m.start_time = std::chrono::time_point_cast<seconds>(system_clock::now());
     m.density = 1;
-    m.productId = 1;
+    m.product_id = 1;
 
     SUBCASE("Insertion") {
         m.id = db->insert(m);
         auto m2 = db->findById(m.id);
 
-        CHECK(m.startTime == m2.startTime);
+        CHECK(m.start_time == m2.start_time);
         CHECK(m.density == m2.density);
     }
 
@@ -168,7 +168,7 @@ TEST_CASE("MeasurementsDB") {
     SUBCASE("Find by Product id") {
         db->insert(m);
         db->insert(m);
-        m.productId = 2;
+        m.product_id = 2;
         db->insert(m);
 
         auto ms = db->findByProductId(1);
@@ -176,7 +176,7 @@ TEST_CASE("MeasurementsDB") {
     }
 
     delete db;
-    remove(dbPath.c_str());
+    remove(db_path.c_str());
 };
 
 }  // namespace pawnshop

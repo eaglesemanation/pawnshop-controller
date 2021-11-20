@@ -13,9 +13,9 @@ namespace pawnshop {
 class Motor {
 public:
     enum Direction : int8_t { NEGATIVE = -1, POSITIVE = 1 };
-    explicit Motor(const gpiod::chip gpioChip, const uint8_t clockLineOffset,
-                   const uint8_t dirLineOffset, bool inverted = false);
-    explicit Motor(gpiod::line clockLine, gpiod::line dirLine,
+    explicit Motor(const gpiod::chip gpio_chip, const uint8_t clock_line_offset,
+                   const uint8_t dir_line_offset, bool inverted = false);
+    explicit Motor(gpiod::line clock_line, gpiod::line dir_line,
                    bool inverted = false);
     Motor() = delete;
     Motor(const Motor&) = delete;
@@ -29,7 +29,7 @@ public:
     int32_t getFrequency() const;
 
 private:
-    gpiod::line clockLine, dirLine;
+    gpiod::line clock_line, dir_line;
     Direction dir;
     const bool inverted;
     bool stopped = true;

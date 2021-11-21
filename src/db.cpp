@@ -1,4 +1,4 @@
-#include "pawnshop/measurement_db.hpp"
+#include "pawnshop/db.hpp"
 
 #include <doctest/doctest.h>
 
@@ -41,7 +41,7 @@ void from_json(const nlohmann::json& j, Measurement& m) {
     j.at("density").get_to(m.density);
 }
 
-MeasurementDb::MeasurementDb(const string& db_path) {
+Db::Db(const string& db_path) {
     sqlite3_open_v2(db_path.c_str(), &db,
                     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     sqlite3_exec(db,
@@ -53,11 +53,49 @@ MeasurementDb::MeasurementDb(const string& db_path) {
                  u8"    startTime INTEGER NOT NULL,"
                  u8"    endTime INTEGER NOT NULL,"
                  u8"    productId INTEGER NOT NULL"
+                 u8");"
+                 u8"CREATE TABLE IF NOT EXISTS calibrationInfo ("
+                 u8"    caretWeight REAL NOT NULL,"
+                 u8"    caretSubmergedWeight REAL NOT NULL"
                  u8");",
                  nullptr, nullptr, nullptr);
 }
 
-MeasurementDb::~MeasurementDb() { sqlite3_close_v2(db); }
+Db::~Db() { sqlite3_close_v2(db); }
+
+void Db::updateCalibrationInfo(const CalibrationInfo& i) {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(
+        db,
+        u8"INSERT OR REPLACE INTO calibrationInfo (rowid, "
+        u8"caretWeight, caretSubmergedWeight) VALUES (1, $weight, $submerged);",
+        -1, &stmt, nullptr);
+    sqlite3_bind_double(stmt, 1, i.caret_weight);
+    sqlite3_bind_double(stmt, 2, i.caret_submerged_weight);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+}
+
+inline CalibrationInfo getCalibrationInfoRow(sqlite3_stmt* stmt) {
+    CalibrationInfo i;
+    i.caret_weight = sqlite3_column_double(stmt, 0);
+    i.caret_submerged_weight = sqlite3_column_double(stmt, 1);
+    return i;
+}
+
+optional<CalibrationInfo> Db::getCalibrationInfo() {
+    optional<CalibrationInfo> res;
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(db, u8"SELECT * FROM calibrationInfo WHERE rowid = 1;",
+                       -1, &stmt, nullptr);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        res = getCalibrationInfoRow(stmt);
+    } else {
+        res = {};
+    }
+    sqlite3_finalize(stmt);
+    return res;
+}
 
 /**
  * Bind all values except rowid to a statement
@@ -84,11 +122,11 @@ inline int64_t bindMeasurementValues(sqlite3_stmt* stmt, const Measurement& m,
     return column_idx;
 }
 
-int64_t MeasurementDb::insert(const Measurement& m) {
+int64_t Db::insertMeasurement(const Measurement& m) {
     sqlite3_stmt* stmt;
     sqlite3_prepare_v2(db,
                        u8"INSERT INTO measurements VALUES ($dirt, $clean, "
-                       u8"$sub, $den, $start, $end, $product) RETURNING rowid",
+                       u8"$sub, $den, $start, $end, $product) RETURNING rowid;",
                        -1, &stmt, nullptr);
 
     bindMeasurementValues(stmt, m);
@@ -98,13 +136,13 @@ int64_t MeasurementDb::insert(const Measurement& m) {
     return id;
 }
 
-void MeasurementDb::update(const Measurement& m) {
+void Db::updateMeasurement(const Measurement& m) {
     sqlite3_stmt* stmt;
     sqlite3_prepare_v2(
         db,
         u8"UPDATE measurements SET dirtyWeight=$dirt, cleanWeight=$clean, "
         u8"submergedWeight=$sub, density=$den, startTime=$start, endTime=$end, "
-        u8"productId=$product WHERE rowid = $id",
+        u8"productId=$product WHERE rowid = $id;",
         -1, &stmt, nullptr);
 
     int64_t column_idx = bindMeasurementValues(stmt, m);
@@ -128,24 +166,27 @@ inline Measurement getMeasurementRow(sqlite3_stmt* stmt) {
     return m;
 }
 
-Measurement MeasurementDb::findById(int64_t id) {
+optional<Measurement> Db::findMeasurementById(int64_t id) {
+    optional<Measurement> res;
     sqlite3_stmt* stmt;
     sqlite3_prepare_v2(db,
-                       u8"SELECT rowid,* FROM measurements WHERE rowid = $id",
+                       u8"SELECT rowid,* FROM measurements WHERE rowid = $id;",
                        -1, &stmt, nullptr);
     sqlite3_bind_int64(stmt, 1, id);
-    sqlite3_step(stmt);
-    Measurement res = getMeasurementRow(stmt);
-
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        res = getMeasurementRow(stmt);
+    } else {
+        res = {};
+    }
     sqlite3_finalize(stmt);
     return res;
 }
 
-vector<Measurement> MeasurementDb::findByProductId(int64_t productId) {
+vector<Measurement> Db::findMeasurementsByProductId(int64_t productId) {
     sqlite3_stmt* stmt;
     sqlite3_prepare_v2(
-        db, u8"SELECT rowid,* FROM measurements WHERE productId = $product", -1,
-        &stmt, nullptr);
+        db, u8"SELECT rowid,* FROM measurements WHERE productId = $product;",
+        -1, &stmt, nullptr);
     sqlite3_bind_int64(stmt, 1, productId);
     vector<Measurement> measurements;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -155,9 +196,9 @@ vector<Measurement> MeasurementDb::findByProductId(int64_t productId) {
     return measurements;
 }
 
-vector<Measurement> MeasurementDb::getAll() {
+vector<Measurement> Db::getAllMeasurements() {
     sqlite3_stmt* stmt;
-    sqlite3_prepare_v2(db, u8"SELECT rowid,* FROM measurements", -1, &stmt,
+    sqlite3_prepare_v2(db, u8"SELECT rowid,* FROM measurements;", -1, &stmt,
                        nullptr);
     vector<Measurement> measurements;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -167,41 +208,63 @@ vector<Measurement> MeasurementDb::getAll() {
     return measurements;
 }
 
-TEST_CASE("MeasurementsDB") {
+TEST_CASE("DB") {
     string db_path = "./testing.sqlite3";
-    auto db = new MeasurementDb(db_path);
+    auto db = new Db(db_path);
 
-    Measurement m;
-    m.start_time = std::chrono::time_point_cast<seconds>(system_clock::now());
-    m.density = 1;
-    m.product_id = 1;
+    SUBCASE("CaretWeight") {
+        CalibrationInfo i;
+        i.caret_weight = 10;
+        i.caret_submerged_weight = 0.1;
 
-    SUBCASE("Insertion") {
-        m.id = db->insert(m);
-        auto m2 = db->findById(m.id);
+        SUBCASE("NotDefined") {
+            auto i = db->getCalibrationInfo();
 
-        CHECK(m.start_time == m2.start_time);
-        CHECK(m.density == m2.density);
+            CHECK(!i.has_value());
+        }
+        SUBCASE("Update") {
+            db->updateCalibrationInfo(i);
+            auto i2 = db->getCalibrationInfo();
+
+            CHECK(i2->caret_weight == i.caret_weight);
+            CHECK(i2->caret_submerged_weight == i.caret_submerged_weight);
+        }
     }
 
-    SUBCASE("Update") {
-        m.id = db->insert(m);
+    SUBCASE("Measurements") {
+        Measurement m;
+        m.start_time =
+            std::chrono::time_point_cast<seconds>(system_clock::now());
+        m.density = 1;
+        m.product_id = 1;
 
-        m.density = 2;
-        db->update(m);
-        auto m2 = db->findById(m.id);
+        SUBCASE("Insertion") {
+            m.id = db->insertMeasurement(m);
+            auto m2 = db->findMeasurementById(m.id);
 
-        CHECK(m.density == m2.density);
-    }
+            CHECK(m.start_time == m2->start_time);
+            CHECK(m.density == m2->density);
+        }
 
-    SUBCASE("Find by Product id") {
-        db->insert(m);
-        db->insert(m);
-        m.product_id = 2;
-        db->insert(m);
+        SUBCASE("Update") {
+            m.id = db->insertMeasurement(m);
 
-        auto ms = db->findByProductId(1);
-        CHECK(ms.size() == 2);
+            m.density = 2;
+            db->updateMeasurement(m);
+            auto m2 = db->findMeasurementById(m.id);
+
+            CHECK(m.density == m2->density);
+        }
+
+        SUBCASE("Find by Product id") {
+            db->insertMeasurement(m);
+            db->insertMeasurement(m);
+            m.product_id = 2;
+            db->insertMeasurement(m);
+
+            auto ms = db->findMeasurementsByProductId(1);
+            CHECK(ms.size() == 2);
+        }
     }
 
     delete db;

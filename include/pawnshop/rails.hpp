@@ -11,15 +11,15 @@ namespace pawnshop {
 
 class Rails {
 public:
-    Rails(std::array<Axis, 3>&& axes);
+    Rails(std::array<Axis, 3>&& axes) : axes(std::move(axes)) {}
     Rails(const Rails&) = delete;
     Rails(Rails&&) = default;
     ~Rails() = default;
     void move(const pawnshop::vec::Vec3D newPos);
+    void calibrate();
     pawnshop::vec::Vec3D getPos();
 
 private:
-    void calibrate();
     std::array<Axis, 3> axes;
 };
 

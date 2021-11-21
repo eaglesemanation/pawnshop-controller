@@ -9,13 +9,14 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <future>
 #include <gpiod.hpp>
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
-#include <pawnshop/measurement_db.hpp>
+#include <pawnshop/db.hpp>
 #include <pawnshop/mqtt_handler.hpp>
 #include <pawnshop/rails.hpp>
 #include <pawnshop/scales.hpp>
@@ -57,7 +58,8 @@ class Controller {
 
     shared_ptr<atomic<bool>> interrupted;
 
-    unique_ptr<MeasurementDb> db;
+    unique_ptr<Db> db;
+    CalibrationInfo calibration_info;
 
     unique_ptr<Scales> scales;
     unique_ptr<Rails> rails;
@@ -65,7 +67,7 @@ class Controller {
     unique_ptr<thread> receiver;
     unique_ptr<thread> task;
 
-    enum State { IDLE, MEASURING, MOVING };
+    enum State { IDLE, MEASURING, MOVING, CALIBRATING };
 
     atomic<State> state = IDLE;
     shared_ptr<condition_variable> state_cv;
@@ -85,9 +87,8 @@ class Controller {
                         // TODO: Add "product_id" to message
                         task =
                             make_unique<thread>(&Controller::measure, this, 0);
-                        state = MEASURING;
                     } else if (state.load() == MEASURING && !flag) {
-                        state = IDLE;
+                        state.store(IDLE);
                         state_cv->notify_all();
                     }
                 } else if (msg.topic == "PawnShop/controller/move") {
@@ -95,9 +96,14 @@ class Controller {
                     spdlog::debug("Moving to (x: {:.1f}, y: {:.1f}, z: {:.1f})",
                                   pos.at(0), pos.at(1), pos.at(2));
                     if (state.load() == IDLE) {
-                        state = MOVING;
+                        state.store(MOVING);
                         rails->move(pos);
-                        state = IDLE;
+                        state.store(IDLE);
+                    }
+                } else if (msg.topic == "PawnShop/controller/calibrate") {
+                    bool flag = msg.payload.get<bool>();
+                    if (state.load() == IDLE && flag) {
+                        calibrate();
                     }
                 }
             } catch (json::exception& e) {
@@ -107,21 +113,69 @@ class Controller {
         }
     }
 
+    void calibrate() {
+        state.store(CALIBRATING);
+
+        auto prev_info = db->getCalibrationInfo();
+
+        rails->calibrate();
+        // Move to the safe height to avoid collisions
+        rails->move({0.0, 0.0, Ztop});
+
+        if (!scales->poweredOn()) {
+            pressScalesButton();
+        }
+
+        double baseline_weight = scales->getWeight().value_or(0);
+
+        calibration_info.caret_weight = scaleWeighting() - baseline_weight;
+        if (prev_info) {
+            if (abs(prev_info->caret_weight - calibration_info.caret_weight) /
+                    prev_info->caret_weight >
+                0.10) {
+                spdlog::warn(
+                    "Caret weight differs from last calibration by more than "
+                    "10%");
+            }
+        }
+
+        calibration_info.caret_submerged_weight =
+            submergedWeighting() - baseline_weight;
+        if (prev_info) {
+            if (abs(prev_info->caret_submerged_weight -
+                    calibration_info.caret_submerged_weight) /
+                    prev_info->caret_submerged_weight >
+                0.10) {
+                spdlog::warn(
+                    "Caret submerged weight differs from last calibration by "
+                    "more that 10%");
+            }
+        }
+
+        drying();
+
+        // Move to the recieving zone
+        rails->move({400.0, 500.0, 150.0});
+
+        db->updateCalibrationInfo(calibration_info);
+
+        state.store(IDLE);
+    }
+
     void measure(int64_t product_id) {
+        state.store(MEASURING);
+
         Measurement m;
         m.product_id = product_id;
-
-        rails->move({0.0, 0.0, Ztop});
 
         mqtt->publish("PawnShop/cmd", "FillUS");
 
         if (!scales->poweredOn()) {
             pressScalesButton();
         }
-        std::optional<double> weight = scales->getWeight();
 
         // permanent weight control while filling
-        double baseline_weight = weight.value();
+        double baseline_weight = scales->getWeight().value_or(0);
         const double desired_weight = 40;
         if (baseline_weight < desired_weight) {
             mqtt->publish("PawnShop/cmd",
@@ -130,11 +184,10 @@ class Controller {
                               .dump());
         }
 
-        double caret_weight = scaleWeighting() - baseline_weight;
-
         getGold();
 
-        m.dirty_weight = scaleWeighting() - caret_weight - baseline_weight;
+        m.dirty_weight =
+            scaleWeighting() - calibration_info.caret_weight - baseline_weight;
 
         // washing
         rails->move({Xus, Yus, Ztop});
@@ -149,22 +202,27 @@ class Controller {
 
         drying();
 
-        m.clean_weight = scaleWeighting() - caret_weight - baseline_weight;
-        m.submerged_weight = submergedWeighting() - baseline_weight - 0.81;
+        m.clean_weight =
+            scaleWeighting() - calibration_info.caret_weight - baseline_weight;
+        m.submerged_weight = submergedWeighting() -
+                             calibration_info.caret_submerged_weight -
+                             baseline_weight;
         m.density = m.clean_weight / m.submerged_weight;
 
         // id generated on insertion
-        m.id = db->insert(m);
+        m.id = db->insertMeasurement(m);
 
         json payload = m;
         mqtt->publish("PawnShop/report", payload.dump());
 
         drying();
 
-        // go home
-        rails->move({0.0, 0.0, 50.0});
+        // Move to the recieving zone
+        rails->move({400.0, 500.0, 150.0});
+        //// go home
+        // rails->move({0.0, 0.0, 50.0});
 
-        state = IDLE;
+        state.store(IDLE);
     }
 
     void getGold() {
@@ -237,14 +295,16 @@ public:
             Axis{150.0, 94000u, 30.0, 600.0, 100.0,
                  Motor{gpio_chip, 19, 26, true}, LimitSwitch{gpio_chip, 12}}});
 
-        db = make_unique<MeasurementDb>("measurements.sqlite3");
+        db = make_unique<Db>("measurements.sqlite3");
 
         receiver = make_unique<thread>(&Controller::recieveMsg, this);
         state_cv = make_unique<condition_variable>();
+
+        calibrate();
     }
 
     ~Controller() {
-        state = IDLE;
+        state.store(IDLE);
         state_cv->notify_all();
 
         if (receiver) receiver->join();

@@ -11,10 +11,6 @@ using namespace pawnshop::vec;
 
 namespace pawnshop {
 
-Rails::Rails(std::array<Axis, 3> &&axes) : axes(std::move(axes)) {
-    calibrate();
-}
-
 void Rails::move(Vec3D newPos) {
     const Vec3D track = newPos - getPos();
     const Vec3D direction = normalize(track);

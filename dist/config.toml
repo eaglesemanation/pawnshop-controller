@@ -1,0 +1,84 @@
+[db]
+path = './measurements.sqlite3'
+
+[scales]
+uart_path = '/dev/ttyS0'
+
+
+[rails]
+gpio_chip = '/dev/gpiochip0'
+
+
+[rails.x_axis]
+length = 435.0
+steps = 17250
+min_speed = 30.0
+max_speed = 600.0
+acceleration = 100.0
+
+[rails.x_axis.motor]
+clock_pin = 6
+direction_pin = 13
+counter_clockwise = true
+
+[rails.x_axis.limit_switches]
+
+# Switch that limits movement in "negative" direction
+[rails.x_axis.limit_switches.negative]
+pin = 25
+
+
+[rails.y_axis]
+length = 530.0
+steps = 26750
+min_speed = 30.0
+max_speed = 600.0
+acceleration = 100.0
+
+[rails.y_axis.motor]
+clock_pin = 20
+direction_pin = 16
+counter_clockwise = false
+
+[rails.y_axis.limit_switches]
+
+[rails.y_axis.limit_switches.negative]
+pin = 5
+
+
+[rails.z_axis]
+length = 150.0
+steps = 94000
+min_speed = 30.0
+max_speed = 600.0
+acceleration = 100.0
+
+[rails.z_axis.motor]
+clock_pin = 19
+direction_pin = 26
+counter_clockwise = true
+
+[rails.z_axis.limit_switches]
+
+[rails.z_axis.limit_switches.negative]
+pin = 5
+
+
+[positioning]
+# Height at which movement will be free of collisions with devices
+safe_height = 150.0
+
+[positioning.dryer]
+coordinate = [120.0, 35.0, 45.0]
+duration = {value = 40, unit = 's'}
+
+[positioning.ultrasonic_bath]
+coordinate = [320.0, 50.0, 70.0]
+duration = {value = 15, unit = 's'}
+
+[positioning.scales]
+coordinate = [60.0, 365.0, 2.0]
+
+[positioning.scales.cup]
+coordinate = [1.0, 365.0, 2.0]
+desired_weight = 44.0

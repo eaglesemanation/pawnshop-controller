@@ -1,8 +1,15 @@
 #pragma once
 
 #include <gpiod.hpp>
+#include <toml++/toml_table.hpp>
 
 namespace pawnshop {
+
+struct LimitSwitchConfig {
+    size_t pin;
+
+    LimitSwitchConfig(const toml::table& table);
+};
 
 class LimitSwitch {
 public:

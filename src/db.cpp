@@ -41,6 +41,10 @@ void from_json(const nlohmann::json& j, Measurement& m) {
     j.at("density").get_to(m.density);
 }
 
+DbConfig::DbConfig(const toml::table& table) {
+    path = table["path"].value<string>().value();
+}
+
 Db::Db(const string& db_path) {
     sqlite3_open_v2(db_path.c_str(), &db,
                     SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);

@@ -9,6 +9,13 @@
 
 namespace pawnshop {
 
+struct RailsConfig {
+    std::string gpio_chip;
+    std::shared_ptr<AxisConfig> x_axis, y_axis, z_axis;
+
+    RailsConfig(const toml::table& table);
+};
+
 class Rails {
 public:
     Rails(std::array<Axis, 3>&& axes) : axes(std::move(axes)) {}

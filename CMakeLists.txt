@@ -52,6 +52,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(readerwriterqueue REQUIRED)
+find_package(tomlplusplus REQUIRED)
 
 include(CTest)
 include(doctest)

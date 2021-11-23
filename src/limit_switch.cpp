@@ -2,6 +2,10 @@
 
 namespace pawnshop {
 
+LimitSwitchConfig::LimitSwitchConfig(const toml::table& table) {
+    pin = table["pin"].value<size_t>().value();
+}
+
 LimitSwitch::LimitSwitch(gpiod::chip chip, size_t offset) {
     line = chip.get_line(offset);
     line.request(

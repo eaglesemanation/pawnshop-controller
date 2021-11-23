@@ -16,6 +16,7 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <pawnshop/config.hpp>
 #include <pawnshop/db.hpp>
 #include <pawnshop/mqtt_handler.hpp>
 #include <pawnshop/rails.hpp>
@@ -53,6 +54,8 @@ using json = nlohmann::json;
 
 // State machine with MQTT messages as events
 class Controller {
+    unique_ptr<Config> config;
+
     shared_ptr<mqtt::async_client> mqtt;
     shared_ptr<MqttHandler::MessageQueue> incoming_messages;
 
@@ -282,6 +285,8 @@ public:
         : mqtt(mqtt),
           incoming_messages(incoming_messages),
           interrupted(interrupted) {
+        config = make_unique<Config>();
+
         gpiod::chip gpio_chip{"/dev/gpiochip0"};
         scales = make_unique<Scales>("/dev/ttyS0");
         // const std::array stepSizeLineOffsets { 22, 27, 17 };

@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <toml++/toml_table.hpp>
 #include <vector>
 
 namespace pawnshop {
@@ -30,6 +31,12 @@ void from_json(const nlohmann::json& j, Measurement& p);
 struct CalibrationInfo {
     double caret_weight;
     double caret_submerged_weight;
+};
+
+struct DbConfig {
+    std::string path;
+
+    DbConfig(const toml::table& table);
 };
 
 class Db {

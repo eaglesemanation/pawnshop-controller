@@ -3,11 +3,24 @@
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <toml++/toml_table.hpp>
 
 #include "limit_switch.hpp"
 #include "motor.hpp"
 
 namespace pawnshop {
+
+struct AxisConfig {
+    double length;
+    uint32_t steps;
+    double min_speed;
+    double max_speed;
+    double acceleration;
+    std::shared_ptr<MotorConfig> motor;
+    std::shared_ptr<LimitSwitchConfig> negative;
+
+    AxisConfig(const toml::table& table);
+};
 
 class Axis {
 public:

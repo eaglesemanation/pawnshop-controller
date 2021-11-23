@@ -6,9 +6,16 @@
 #include <thread>
 #include <vector>
 
+using namespace std;
 using namespace std::chrono_literals;
 
 namespace pawnshop {
+
+MotorConfig::MotorConfig(const toml::table& table) {
+    clock_pin = table["clock_pin"].value<size_t>().value();
+    direction_pin = table["direction_pin"].value<size_t>().value();
+    counter_clockwire = table["counter_clockwise"].value<bool>().value();
+}
 
 Motor::Motor(gpiod::line clock_line, gpiod::line dir_line,
              bool inverted /* = false */

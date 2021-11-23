@@ -1,11 +1,19 @@
 #pragma once
+
 #include <chrono>
 #include <fstream>
 #include <future>
 #include <optional>
 #include <string>
+#include <toml++/toml_table.hpp>
 
 namespace pawnshop {
+
+struct ScalesConfig {
+    std::string uart_path;
+
+    ScalesConfig(const toml::table& table);
+};
 
 class Scales {
 public:

@@ -5,10 +5,19 @@
 #include <chrono>
 #include <future>
 #include <gpiod.hpp>
+#include <toml++/toml_table.hpp>
 
 #include "limit_switch.hpp"
 
 namespace pawnshop {
+
+struct MotorConfig {
+    size_t clock_pin;
+    size_t direction_pin;
+    bool counter_clockwire;
+
+    MotorConfig(const toml::table& table);
+};
 
 class Motor {
 public:

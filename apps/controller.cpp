@@ -54,7 +54,7 @@ using json = nlohmann::json;
 
 // State machine with MQTT messages as events
 class Controller {
-    unique_ptr<Config> config;
+    shared_ptr<Config> config;
 
     shared_ptr<mqtt::async_client> mqtt;
     shared_ptr<MqttHandler::MessageQueue> incoming_messages;
@@ -279,13 +279,13 @@ class Controller {
     }
 
 public:
-    Controller(shared_ptr<mqtt::async_client> mqtt,
+    Controller(shared_ptr<Config> config,
+               shared_ptr<mqtt::async_client> mqtt,
                shared_ptr<MqttHandler::MessageQueue> incoming_messages,
                shared_ptr<atomic<bool>> interrupted)
         : mqtt(mqtt),
           incoming_messages(incoming_messages),
           interrupted(interrupted) {
-        config = make_unique<Config>();
 
         gpiod::chip gpio_chip{"/dev/gpiochip0"};
         scales = make_unique<Scales>("/dev/ttyS0");
@@ -334,6 +334,8 @@ int main(int argc, char** argv) {
     // If you want to hide debug messages - comment this line
     spdlog::set_level(spdlog::level::debug);
 
+    auto config = make_shared<Config>();
+
     auto mqtt = make_shared<mqtt::async_client>("tcp://lombardmat.local:1883",
                                                 "controller");
     auto mqtt_options = mqtt::connect_options_builder()
@@ -346,7 +348,7 @@ int main(int argc, char** argv) {
     mqtt->set_callback(mqtt_handler);
     mqtt->connect(mqtt_options, nullptr, mqtt_handler);
 
-    Controller controller(mqtt, incoming_messages, shutdown_requested);
+    Controller controller(config, mqtt, incoming_messages, shutdown_requested);
 
     int signum = 0;
     sigwait(&sigset, &signum);

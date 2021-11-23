@@ -7,6 +7,7 @@
 #include "pawnshop/rails.hpp"
 #include "pawnshop/scales.hpp"
 #include "pawnshop/vec.hpp"
+#include "pawnshop/mqtt_handler.hpp"
 
 namespace pawnshop {
 
@@ -54,6 +55,7 @@ public:
     std::shared_ptr<ScalesConfig> scales;
     std::shared_ptr<RailsConfig> rails;
     std::shared_ptr<PositioningConfig> positioning;
+    std::shared_ptr<MqttConfig> mqtt;
 
     Config();
 };

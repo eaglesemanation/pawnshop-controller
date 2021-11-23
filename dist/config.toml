@@ -1,3 +1,9 @@
+[mqtt]
+broker_url = 'tcp://lombardmat.local:1883'
+client_id = 'controller'
+username = 'controller'
+password = 'controller'
+
 [db]
 path = './measurements.sqlite3'
 

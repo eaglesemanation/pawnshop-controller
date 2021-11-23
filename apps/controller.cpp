@@ -81,6 +81,8 @@ class Controller {
                 task.reset();
             }
             try {
+                spdlog::debug("Recieved message, topic: {}, current state: {}",
+                              msg.topic, state.load());
                 if (msg.topic == "PawnShop/controller/measure") {
                     bool flag = msg.payload.get<bool>();
                     if (state.load() == IDLE && flag) {

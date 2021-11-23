@@ -44,6 +44,7 @@ void MqttHandler::connected(const std::string& cause) {
     spdlog::info("Connected to MQTT broker");
     mqtt->subscribe("PawnShop/controller/measure", QOS);
     mqtt->subscribe("PawnShop/controller/move", QOS);
+    mqtt->subscribe("PawnShop/controller/calibrate", QOS);
 }
 
 // Called on arrival of message on any of topics we subscribed to

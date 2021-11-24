@@ -59,6 +59,7 @@ public:
     std::optional<Measurement> findMeasurementById(int64_t id);
     std::vector<Measurement> findMeasurementsByProductId(int64_t product_id);
     std::vector<Measurement> getAllMeasurements();
+    size_t getMeasurementsAmount();
 
 private:
     Db(const std::string& db_path);

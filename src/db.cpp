@@ -210,6 +210,7 @@ vector<Measurement> Db::findMeasurementsByProductId(int64_t productId) {
         Measurement m = getMeasurementRow(stmt);
         measurements.push_back(move(m));
     }
+    sqlite3_finalize(stmt);
     return measurements;
 }
 
@@ -218,18 +219,31 @@ vector<Measurement> Db::getAllMeasurements() {
     sqlite3_prepare_v2(db, u8"SELECT rowid,* FROM measurements;", -1, &stmt,
                        nullptr);
     vector<Measurement> measurements;
+    measurements.reserve(getMeasurementsAmount());
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         Measurement m = getMeasurementRow(stmt);
         measurements.push_back(move(m));
     }
+    sqlite3_finalize(stmt);
     return measurements;
+}
+
+size_t Db::getMeasurementsAmount() {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(db, u8"SELECT count(*) FROM measurements;", -1, &stmt,
+                       nullptr);
+    size_t count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        count = sqlite3_column_int(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
+    return count;
 }
 
 TEST_CASE("DB") {
     using namespace std::string_view_literals;
 
     static constexpr auto source = R"(
-        [db]
         path = './test.sqlite3'
     )"sv;
     toml::table tbl = toml::parse(source);
@@ -289,6 +303,15 @@ TEST_CASE("DB") {
 
             auto ms = db->findMeasurementsByProductId(1);
             CHECK(ms.size() == 2);
+        }
+
+        SUBCASE("Count") {
+            size_t count = 3;
+            for (size_t i = 0; i < count; i++) {
+                db->insertMeasurement(m);
+            }
+
+            CHECK(db->getMeasurementsAmount() == count);
         }
     }
 

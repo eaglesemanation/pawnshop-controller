@@ -183,10 +183,8 @@ class Controller {
 
         drying();
 
-        // Move to the recieving zone
-        rails->move({400.0, 500.0, 150.0});
-        //// go home
-        // rails->move({0.0, 0.0, 50.0});
+        const auto& reciever_coord = dev->gold_reciever->coordinate;
+        rails->move({reciever_coord[0], reciever_coord[1], dev->safe_height});
 
         state.store(IDLE);
     }

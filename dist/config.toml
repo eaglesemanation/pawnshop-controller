@@ -86,7 +86,7 @@ duration = {value = 15, unit = 's'}
 coordinate = [60.0, 365.0, 2.0]
 
 [devices.scales.cup]
-coordinate = [1.0, 365.0, 2.0]
+coordinate = [1.0, 352.0, 2.0]
 desired_weight = 44.0
 
 [devices.scales.power_button]

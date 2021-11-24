@@ -4,6 +4,7 @@
 #include <mqtt/callback.h>
 #include <mqtt/connect_options.h>
 #include <readerwriterqueue/readerwriterqueue.h>
+#include <toml++/toml_table.hpp>
 
 #include <atomic>
 #include <condition_variable>
@@ -13,6 +14,15 @@
 #include <unordered_map>
 
 namespace pawnshop {
+
+struct MqttConfig {
+    std::string broker_url;
+    std::string client_id;
+    std::string username;
+    std::string password;
+
+    MqttConfig(const toml::table& table);
+};
 
 struct MqttMessage {
     std::string topic;

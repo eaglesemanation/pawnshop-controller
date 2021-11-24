@@ -7,9 +7,17 @@
 
 #include "pawnshop/util.hpp"
 
+using namespace std;
+
 namespace pawnshop {
 
+ScalesConfig::ScalesConfig(const toml::table& table) {
+    uart_path = table["uart_path"].value<string>().value();
+}
+
 Scales::Scales(const std::string serial_path) : serial_path(serial_path) {}
+
+Scales::Scales(const unique_ptr<ScalesConfig> conf) : Scales{conf->uart_path} {}
 
 Scales::~Scales() {}
 

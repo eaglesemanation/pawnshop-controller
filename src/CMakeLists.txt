@@ -11,6 +11,7 @@ set(PUBLIC_DEPS_LIST
     Gpiod::Gpiod
     SQLite::SQLite3
     nlohmann_json::nlohmann_json
+    tomlplusplus::tomlplusplus
     PahoMqttCpp::paho-mqttpp3-static
     readerwriterqueue::readerwriterqueue)
 

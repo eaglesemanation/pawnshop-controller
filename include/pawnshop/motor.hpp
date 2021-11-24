@@ -5,18 +5,28 @@
 #include <chrono>
 #include <future>
 #include <gpiod.hpp>
+#include <toml++/toml_table.hpp>
 
 #include "limit_switch.hpp"
 
 namespace pawnshop {
 
+struct MotorConfig {
+    size_t clock_pin;
+    size_t direction_pin;
+    bool counter_clockwire;
+
+    MotorConfig(const toml::table& table);
+};
+
 class Motor {
-public:
-    enum Direction : int8_t { NEGATIVE = -1, POSITIVE = 1 };
     explicit Motor(const gpiod::chip gpio_chip, const uint8_t clock_line_offset,
-                   const uint8_t dir_line_offset, bool inverted = false);
+                   const uint8_t dir_line_offset, bool inverted);
     explicit Motor(gpiod::line clock_line, gpiod::line dir_line,
                    bool inverted = false);
+public:
+    explicit Motor(gpiod::chip chip, const std::unique_ptr<MotorConfig> conf);
+    enum Direction : int8_t { NEGATIVE = -1, POSITIVE = 1 };
     Motor() = delete;
     Motor(const Motor&) = delete;
     Motor(Motor&&);

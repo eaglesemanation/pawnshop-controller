@@ -11,6 +11,13 @@ using json = nlohmann::json;
 
 namespace pawnshop {
 
+MqttConfig::MqttConfig(const toml::table& table) {
+    broker_url = table["broker_url"].value<string>().value();
+    client_id = table["client_id"].value<string>().value();
+    username = table["username"].value<string>().value();
+    password = table["password"].value<string>().value();
+}
+
 // Tries to reconnect with delay, unless interupted
 void MqttHandler::reconnect() {
     unique_lock lk(interupt_cv_m);

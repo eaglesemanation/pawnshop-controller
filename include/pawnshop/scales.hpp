@@ -1,16 +1,25 @@
 #pragma once
+
 #include <chrono>
 #include <fstream>
 #include <future>
 #include <optional>
 #include <string>
+#include <toml++/toml_table.hpp>
 
 namespace pawnshop {
 
+struct ScalesConfig {
+    std::string uart_path;
+
+    ScalesConfig(const toml::table& table);
+};
+
 class Scales {
-public:
     Scales(const std::string serialPath);
-    virtual ~Scales();
+public:
+    Scales(const std::unique_ptr<ScalesConfig> conf);
+    ~Scales();
     std::optional<double> getWeight();
     bool poweredOn(
         std::chrono::duration<int> timeout = std::chrono::seconds(10));

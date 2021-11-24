@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <toml++/toml_table.hpp>
 #include <vector>
 
 namespace pawnshop {
@@ -32,9 +33,15 @@ struct CalibrationInfo {
     double caret_submerged_weight;
 };
 
+struct DbConfig {
+    std::string path;
+
+    DbConfig(const toml::table& table);
+};
+
 class Db {
 public:
-    Db(const std::string& db_path);
+    Db(const std::unique_ptr<DbConfig> conf);
     Db(const Db&) = delete;
     ~Db();
 
@@ -51,6 +58,7 @@ public:
     std::vector<Measurement> getAllMeasurements();
 
 private:
+    Db(const std::string& db_path);
     sqlite3* db = nullptr;
 };
 

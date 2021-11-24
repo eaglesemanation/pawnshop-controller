@@ -5,6 +5,7 @@ paho-mqtt-cpp/1.2.0
 fmt/8.0.1
 spdlog/1.9.2
 readerwriterqueue/1.0.5
+tomlplusplus/2.5.0
 
 [build_requires]
 doctest/2.4.6

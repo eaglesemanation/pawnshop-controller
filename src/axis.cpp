@@ -3,11 +3,25 @@
 #include <cmath>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <thread>
 
+using namespace std;
 using namespace std::chrono_literals;
 
 namespace pawnshop {
+
+AxisConfig::AxisConfig(const toml::table &table) {
+    length = table["length"].value<double>().value();
+    steps = table["steps"].value<uint32_t>().value();
+    min_speed = table["min_speed"].value<double>().value();
+    max_speed = table["max_speed"].value<double>().value();
+    acceleration = table["acceleration"].value<double>().value();
+
+    motor = make_unique<MotorConfig>(*table["motor"].as_table());
+    negative = make_unique<LimitSwitchConfig>(
+        *table["limit_switches"]["negative"].as_table());
+}
 
 Axis::Axis(const double axis_length, const uint32_t step_count,
            const double min_speed, const double max_speed,
@@ -19,6 +33,15 @@ Axis::Axis(const double axis_length, const uint32_t step_count,
       MIN_SPEED(min_speed),
       MAX_SPEED(max_speed),
       ACCELERATION(acceleration) {}
+
+Axis::Axis(gpiod::chip chip, const unique_ptr<AxisConfig> conf)
+    : Axis{conf->length,
+           conf->steps,
+           conf->min_speed,
+           conf->max_speed,
+           conf->acceleration,
+           Motor{chip, std::move(conf->motor)},
+           LimitSwitch{chip, std::move(conf->negative)}} {}
 
 Axis::Axis(Axis &&src)
     : motor(std::move(src.motor)),
@@ -67,7 +90,8 @@ void Axis::move(const double new_pos, const double scaling) {
         std::this_thread::sleep_for(dt);
     }
     // Deceleration
-    while (dir * (new_pos - getPosition()) > 0 && dir * (getSpeed() - v_0) > 0) {
+    while (dir * (new_pos - getPosition()) > 0 &&
+           dir * (getSpeed() - v_0) > 0) {
         setSpeed(getSpeed() - dv);
         std::this_thread::sleep_for(dt);
     }

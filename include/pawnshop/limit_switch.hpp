@@ -1,12 +1,20 @@
 #pragma once
 
 #include <gpiod.hpp>
+#include <toml++/toml_table.hpp>
 
 namespace pawnshop {
 
+struct LimitSwitchConfig {
+    size_t pin;
+
+    LimitSwitchConfig(const toml::table& table);
+};
+
 class LimitSwitch {
-public:
     LimitSwitch(gpiod::chip chip, size_t offset);
+public:
+    LimitSwitch(gpiod::chip chip, const std::unique_ptr<LimitSwitchConfig> conf);
     LimitSwitch() = delete;
     LimitSwitch(const LimitSwitch&) = delete;
     LimitSwitch(LimitSwitch&&) = default;

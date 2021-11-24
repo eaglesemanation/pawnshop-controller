@@ -262,10 +262,12 @@ class Controller {
 
     /**
      * Measure object weight submerged in cup
+     * In case cup is not filled enough - it will request filling and update
+     * baseline_weight accordingly
      *
      * @returns measured weight or 0 in case of failure
      */
-    double submergedWeighting(double baseline_weight) {
+    double submergedWeighting(double& baseline_weight) {
         const auto& cup_coord = dev->scales->cup->coordinate;
         const Vec3D cup_top_coord = {cup_coord[0], cup_coord[1],
                                      dev->safe_height};
@@ -276,6 +278,8 @@ class Controller {
                           json{{"cmd", "FillCup"},
                                {"Value", desired_weight - baseline_weight}}
                               .dump());
+            this_thread::sleep_for(1s);
+            baseline_weight = scales->getWeight().value_or(0);
         }
 
         rails->move(cup_top_coord);

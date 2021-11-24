@@ -27,44 +27,55 @@ inline Vec3D parseCoord(const toml::array& array) {
     return coord;
 }
 
-PositioningConfig::Dryer::Dryer(const toml::table& table) {
+DevicesConfig::Dryer::Dryer(const toml::table& table) {
     coordinate = parseCoord(*table["coordinate"].as_array());
     duration = parseDuration(*table["duration"].as_table());
 }
 
-PositioningConfig::UltrasonicBath::UltrasonicBath(const toml::table& table) {
+DevicesConfig::UltrasonicBath::UltrasonicBath(const toml::table& table) {
     coordinate = parseCoord(*table["coordinate"].as_array());
     duration = parseDuration(*table["duration"].as_table());
 }
 
-PositioningConfig::Scales::Scales(const toml::table& table) {
+DevicesConfig::Scales::Scales(const toml::table& table) {
     coordinate = parseCoord(*table["coordinate"].as_array());
 
     cup = make_unique<Cup>(*table["cup"].as_table());
+    power_button = make_unique<PowerButton>(*table["power_button"].as_table());
 }
 
-PositioningConfig::Scales::Cup::Cup(const toml::table& table) {
+DevicesConfig::Scales::Cup::Cup(const toml::table& table) {
     coordinate = parseCoord(*table["coordinate"].as_array());
     desired_weight = table["desired_weight"].value<double>().value();
 }
 
-PositioningConfig::PositioningConfig(const toml::table& table) {
+DevicesConfig::Scales::PowerButton::PowerButton(const toml::table& table) {
+    coordinate = parseCoord(*table["coordinate"].as_array());
+}
+
+DevicesConfig::GoldReciever::GoldReciever(const toml::table& table) {
+    coordinate = parseCoord(*table["coordinate"].as_array());
+}
+
+DevicesConfig::DevicesConfig(const toml::table& table) {
     safe_height = table["safe_height"].value<double>().value();
 
     dryer = make_unique<Dryer>(*table["dryer"].as_table());
     ultrasonic_bath =
         make_unique<UltrasonicBath>(*table["ultrasonic_bath"].as_table());
     scales = make_unique<Scales>(*table["scales"].as_table());
+    gold_reciever =
+        make_unique<GoldReciever>(*table["gold_reciever"].as_table());
 }
 
 Config::Config(const string& toml_path) {
     auto table = toml::parse_file(toml_path);
 
-    scales = make_shared<ScalesConfig>(*table["scales"].as_table());
-    rails = make_shared<RailsConfig>(*table["rails"].as_table());
-    db = make_shared<DbConfig>(*table["db"].as_table());
-    positioning =
-        make_shared<PositioningConfig>(*table["positioning"].as_table());
+    scales = make_unique<ScalesConfig>(*table["scales"].as_table());
+    rails = make_unique<RailsConfig>(*table["rails"].as_table());
+    db = make_unique<DbConfig>(*table["db"].as_table());
+    devices = make_unique<DevicesConfig>(*table["devices"].as_table());
+    mqtt = make_unique<MqttConfig>(*table["mqtt"].as_table());
 }
 
 Config::Config() : Config("./dist/config.toml") {}

@@ -70,21 +70,27 @@ counter_clockwise = true
 pin = 5
 
 
-[positioning]
+[devices]
 # Height at which movement will be free of collisions with devices
 safe_height = 150.0
 
-[positioning.dryer]
+[devices.dryer]
 coordinate = [120.0, 35.0, 45.0]
 duration = {value = 40, unit = 's'}
 
-[positioning.ultrasonic_bath]
+[devices.ultrasonic_bath]
 coordinate = [320.0, 50.0, 70.0]
 duration = {value = 15, unit = 's'}
 
-[positioning.scales]
+[devices.scales]
 coordinate = [60.0, 365.0, 2.0]
 
-[positioning.scales.cup]
+[devices.scales.cup]
 coordinate = [1.0, 365.0, 2.0]
 desired_weight = 44.0
+
+[devices.scales.power_button]
+coordinate = [400.0, 515.0, 150.0]
+
+[devices.gold_reciever]
+coordinate = [400.0, 470.0, 50.0]

@@ -3,6 +3,7 @@
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <gpiod.hpp>
 #include <toml++/toml_table.hpp>
 
 #include "limit_switch.hpp"
@@ -16,21 +17,19 @@ struct AxisConfig {
     double min_speed;
     double max_speed;
     double acceleration;
-    std::shared_ptr<MotorConfig> motor;
-    std::shared_ptr<LimitSwitchConfig> negative;
+    std::unique_ptr<MotorConfig> motor;
+    std::unique_ptr<LimitSwitchConfig> negative;
 
     AxisConfig(const toml::table& table);
 };
 
 class Axis {
-public:
-    /**
-     * @param stepCount amount of steps in axis
-     */
     explicit Axis(const double axis_length, const uint32_t step_count,
                   const double min_speed, const double max_speed,
                   const double axeleration, Motor&& motor,
                   LimitSwitch&& negative);
+public:
+    explicit Axis(gpiod::chip chip, const std::unique_ptr<AxisConfig> conf);
     Axis(const Axis&) = delete;
     Axis(Axis&&);
     Axis& operator=(const Axis&) = delete;

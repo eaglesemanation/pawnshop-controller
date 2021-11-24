@@ -36,6 +36,10 @@ Motor::Motor(const gpiod::chip gpio_chip, const uint8_t clock_line_offset,
     : Motor(gpio_chip.get_line(clock_line_offset),
             gpio_chip.get_line(dir_line_offset), inverted) {}
 
+Motor::Motor(gpiod::chip chip, const std::unique_ptr<MotorConfig> conf)
+    : Motor{chip, conf->clock_pin, conf->direction_pin,
+            conf->counter_clockwire} {}
+
 Motor::Motor(Motor&& src)
     : clock_line(std::move(src.clock_line)),
       dir_line(std::move(src.dir_line)),

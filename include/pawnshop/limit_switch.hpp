@@ -12,8 +12,9 @@ struct LimitSwitchConfig {
 };
 
 class LimitSwitch {
-public:
     LimitSwitch(gpiod::chip chip, size_t offset);
+public:
+    LimitSwitch(gpiod::chip chip, const std::unique_ptr<LimitSwitchConfig> conf);
     LimitSwitch() = delete;
     LimitSwitch(const LimitSwitch&) = delete;
     LimitSwitch(LimitSwitch&&) = default;

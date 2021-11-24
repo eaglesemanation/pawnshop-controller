@@ -3,6 +3,7 @@
 #include <array>
 #include <mutex>
 #include <shared_mutex>
+#include <gpiod.hpp>
 
 #include "axis.hpp"
 #include "vec.hpp"
@@ -11,14 +12,14 @@ namespace pawnshop {
 
 struct RailsConfig {
     std::string gpio_chip;
-    std::shared_ptr<AxisConfig> x_axis, y_axis, z_axis;
+    std::array<std::unique_ptr<AxisConfig>, 3> axes;
 
     RailsConfig(const toml::table& table);
 };
 
 class Rails {
 public:
-    Rails(std::array<Axis, 3>&& axes) : axes(std::move(axes)) {}
+    Rails(const std::unique_ptr<RailsConfig> conf);
     Rails(const Rails&) = delete;
     Rails(Rails&&) = default;
     ~Rails() = default;
@@ -27,7 +28,8 @@ public:
     pawnshop::vec::Vec3D getPos();
 
 private:
-    std::array<Axis, 3> axes;
+    std::array<std::unique_ptr<Axis>, 3> axes;
+    gpiod::chip chip;
 };
 
 }  // namespace pawnshop

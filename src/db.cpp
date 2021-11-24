@@ -1,6 +1,7 @@
 #include "pawnshop/db.hpp"
 
 #include <doctest/doctest.h>
+#include <toml++/toml.h>
 
 #include <chrono>
 #include <cstdio>
@@ -44,6 +45,8 @@ void from_json(const nlohmann::json& j, Measurement& m) {
 DbConfig::DbConfig(const toml::table& table) {
     path = table["path"].value<string>().value();
 }
+
+Db::Db(const unique_ptr<DbConfig> conf) : Db(conf->path) {}
 
 Db::Db(const string& db_path) {
     sqlite3_open_v2(db_path.c_str(), &db,
@@ -213,8 +216,16 @@ vector<Measurement> Db::getAllMeasurements() {
 }
 
 TEST_CASE("DB") {
-    string db_path = "./testing.sqlite3";
-    auto db = new Db(db_path);
+    using namespace std::string_view_literals;
+
+    static constexpr auto source = R"(
+        [db]
+        path = './test.sqlite3'
+    )"sv;
+    toml::table tbl = toml::parse(source);
+    auto conf = make_unique<DbConfig>(tbl);
+    auto db_path = conf->path;
+    auto db = new Db(move(conf));
 
     SUBCASE("CaretWeight") {
         CalibrationInfo i;

@@ -17,6 +17,8 @@ ScalesConfig::ScalesConfig(const toml::table& table) {
 
 Scales::Scales(const std::string serial_path) : serial_path(serial_path) {}
 
+Scales::Scales(const unique_ptr<ScalesConfig> conf) : Scales{conf->uart_path} {}
+
 Scales::~Scales() {}
 
 std::optional<Scales::State> Scales::parse(const std::string line) {

@@ -16,9 +16,10 @@ struct ScalesConfig {
 };
 
 class Scales {
-public:
     Scales(const std::string serialPath);
-    virtual ~Scales();
+public:
+    Scales(const std::unique_ptr<ScalesConfig> conf);
+    ~Scales();
     std::optional<double> getWeight();
     bool poweredOn(
         std::chrono::duration<int> timeout = std::chrono::seconds(10));

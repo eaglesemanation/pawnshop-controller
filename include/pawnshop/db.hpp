@@ -41,7 +41,7 @@ struct DbConfig {
 
 class Db {
 public:
-    Db(const std::string& db_path);
+    Db(const std::unique_ptr<DbConfig> conf);
     Db(const Db&) = delete;
     ~Db();
 
@@ -58,6 +58,7 @@ public:
     std::vector<Measurement> getAllMeasurements();
 
 private:
+    Db(const std::string& db_path);
     sqlite3* db = nullptr;
 };
 

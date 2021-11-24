@@ -4,14 +4,14 @@
 #include <string>
 
 #include "pawnshop/db.hpp"
+#include "pawnshop/mqtt_handler.hpp"
 #include "pawnshop/rails.hpp"
 #include "pawnshop/scales.hpp"
 #include "pawnshop/vec.hpp"
-#include "pawnshop/mqtt_handler.hpp"
 
 namespace pawnshop {
 
-struct PositioningConfig {
+struct DevicesConfig {
     double safe_height;
 
     struct Dryer {
@@ -40,22 +40,36 @@ struct PositioningConfig {
         };
         std::unique_ptr<Cup> cup;
 
+        struct PowerButton {
+            vec::Vec3D coordinate;
+
+            PowerButton(const toml::table& table);
+        };
+        std::unique_ptr<PowerButton> power_button;
+
         Scales(const toml::table& table);
     };
     std::unique_ptr<Scales> scales;
 
-    PositioningConfig(const toml::table& table);
+    struct GoldReciever {
+        vec::Vec3D coordinate;
+
+        GoldReciever(const toml::table& table);
+    };
+    std::unique_ptr<GoldReciever> gold_reciever;
+
+    DevicesConfig(const toml::table& table);
 };
 
 class Config {
     Config(const std::string& toml_path);
 
 public:
-    std::shared_ptr<DbConfig> db;
-    std::shared_ptr<ScalesConfig> scales;
-    std::shared_ptr<RailsConfig> rails;
-    std::shared_ptr<PositioningConfig> positioning;
-    std::shared_ptr<MqttConfig> mqtt;
+    std::unique_ptr<DbConfig> db;
+    std::unique_ptr<ScalesConfig> scales;
+    std::unique_ptr<RailsConfig> rails;
+    std::unique_ptr<DevicesConfig> devices;
+    std::unique_ptr<MqttConfig> mqtt;
 
     Config();
 };

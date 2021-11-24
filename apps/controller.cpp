@@ -186,6 +186,10 @@ class Controller {
 
         drying();
 
+        if (db->getMeasurementsAmount() % 10 == 0) {
+            mqtt->publish("PawnShop/cmd", "Empty");
+        }
+
         const auto& reciever_coord = dev->gold_reciever->coordinate;
         rails->move({reciever_coord[0], reciever_coord[1], dev->safe_height});
 

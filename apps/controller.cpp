@@ -54,6 +54,10 @@ class Controller {
     atomic<State> state = IDLE;
     shared_ptr<condition_variable> state_cv;
 
+    json user_response;
+    mutex user_response_mx;
+    shared_ptr<condition_variable> user_response_cv;
+
     void recieveMsg() {
         while (!interrupted->load()) {
             MqttMessage msg;
@@ -89,6 +93,15 @@ class Controller {
                     if (state.load() == IDLE && flag) {
                         calibrate();
                     }
+                } else if (msg.topic ==
+                           "PawnShop/controller/calibration/accept") {
+                    if (state.load() == CALIBRATING) {
+                        {
+                            std::unique_lock lk(user_response_mx);
+                            user_response = msg.payload;
+                        }
+                        user_response_cv->notify_all();
+                    }
                 }
             } catch (json::exception& e) {
                 spdlog::warn("Ill-formed message on topic \"{}\": {}",
@@ -111,6 +124,8 @@ class Controller {
         }
 
         double baseline_weight = scales->getWeight().value_or(0);
+        bool high_deviation = false;
+        bool update_info = true;
 
         calibration_info.caret_weight = scaleWeighting(baseline_weight);
         if (prev_info) {
@@ -120,6 +135,7 @@ class Controller {
                 spdlog::warn(
                     "Caret weight differs from last calibration by more than "
                     "10%");
+                high_deviation = true;
             }
         }
 
@@ -133,6 +149,7 @@ class Controller {
                 spdlog::warn(
                     "Caret submerged weight differs from last calibration by "
                     "more that 10%");
+                high_deviation = true;
             }
         }
 
@@ -141,7 +158,35 @@ class Controller {
         const auto& reciever_coord = dev->gold_reciever->coordinate;
         rails->move({reciever_coord[0], reciever_coord[1], dev->safe_height});
 
-        db->updateCalibrationInfo(calibration_info);
+        json payload = calibration_info;
+        payload.update(json{{"high_deviation", high_deviation}});
+        mqtt->publish("PawnShop/report/calibration_info", payload.dump());
+
+        if (high_deviation) {
+            update_info = false;
+
+            // Wait for response from MQTT
+            {
+                mutex mx;
+                unique_lock lk(mx);
+                user_response_cv->wait(lk);
+            }
+
+            unique_lock lk(user_response_mx);
+            try {
+                update_info = user_response.get<bool>();
+            } catch (json::exception& e) {
+                spdlog::info(
+                    "Ill-formed response for updating calibration info, using "
+                    "previous info");
+            }
+        }
+
+        if (update_info) {
+            db->updateCalibrationInfo(calibration_info);
+        } else if (prev_info.has_value()) {
+            calibration_info = prev_info.value();
+        }
 
         state.store(IDLE);
     }

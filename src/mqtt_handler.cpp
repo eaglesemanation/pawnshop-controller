@@ -52,6 +52,7 @@ void MqttHandler::connected(const std::string& cause) {
     mqtt->subscribe("PawnShop/controller/measure", QOS);
     mqtt->subscribe("PawnShop/controller/move", QOS);
     mqtt->subscribe("PawnShop/controller/calibrate", QOS);
+    mqtt->subscribe("PawnShop/controller/calibration/accept", QOS);
 }
 
 // Called on arrival of message on any of topics we subscribed to

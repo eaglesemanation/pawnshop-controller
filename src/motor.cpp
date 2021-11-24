@@ -30,8 +30,8 @@ Motor::Motor(gpiod::line clock_line, gpiod::line dir_line,
     setDirection(POSITIVE);
 }
 
-Motor::Motor(const gpiod::chip gpio_chip, const uint8_t clock_line_offset,
-             const uint8_t dir_line_offset, bool inverted /* = false */
+Motor::Motor(const gpiod::chip gpio_chip, const size_t clock_line_offset,
+             const size_t dir_line_offset, bool inverted /* = false */
              )
     : Motor(gpio_chip.get_line(clock_line_offset),
             gpio_chip.get_line(dir_line_offset), inverted) {}

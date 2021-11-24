@@ -20,10 +20,11 @@ struct MotorConfig {
 };
 
 class Motor {
-    explicit Motor(const gpiod::chip gpio_chip, const uint8_t clock_line_offset,
-                   const uint8_t dir_line_offset, bool inverted);
+    explicit Motor(const gpiod::chip gpio_chip, const size_t clock_line_offset,
+                   const size_t dir_line_offset, bool inverted);
     explicit Motor(gpiod::line clock_line, gpiod::line dir_line,
                    bool inverted = false);
+
 public:
     explicit Motor(gpiod::chip chip, const std::unique_ptr<MotorConfig> conf);
     enum Direction : int8_t { NEGATIVE = -1, POSITIVE = 1 };

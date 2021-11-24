@@ -32,30 +32,8 @@ using namespace pawnshop;
 using namespace pawnshop::vec;
 using json = nlohmann::json;
 
-// begin of laser532 code here
-#define Ztop 150.0
-#define Zbtm 50.0
-#define Xcup 1.0
-#define Ycup 350.0
-#define Zcup 15
-#define Xscl 60.0
-#define Yscl 365.0
-#define Zscl 2
-#define Xus 320.0
-#define Yus 50.0
-#define Zus 70
-#define Xdr 120.0
-#define Ydr 35.0
-#define Zdr 45
-#define tdr 40s
-#define tus 15s
-
-// end code of laser532
-
 // State machine with MQTT messages as events
 class Controller {
-    shared_ptr<Config> config;
-
     shared_ptr<mqtt::async_client> mqtt;
     shared_ptr<MqttHandler::MessageQueue> incoming_messages;
 
@@ -66,6 +44,7 @@ class Controller {
 
     unique_ptr<Scales> scales;
     unique_ptr<Rails> rails;
+    unique_ptr<DevicesConfig> dev;
 
     unique_ptr<thread> receiver;
     unique_ptr<thread> task;
@@ -123,7 +102,7 @@ class Controller {
 
         rails->calibrate();
         // Move to the safe height to avoid collisions
-        rails->move({0.0, 0.0, Ztop});
+        rails->move({0.0, 0.0, dev->safe_height});
 
         if (!scales->poweredOn()) {
             pressScalesButton();
@@ -157,8 +136,8 @@ class Controller {
 
         drying();
 
-        // Move to the recieving zone
-        rails->move({400.0, 500.0, 150.0});
+        const auto& reciever_coord = dev->gold_reciever->coordinate;
+        rails->move({reciever_coord[0], reciever_coord[1], dev->safe_height});
 
         db->updateCalibrationInfo(calibration_info);
 
@@ -192,16 +171,7 @@ class Controller {
         m.dirty_weight =
             scaleWeighting() - calibration_info.caret_weight - baseline_weight;
 
-        // washing
-        rails->move({Xus, Yus, Ztop});
-        rails->move({Xus, Yus, Zus});
-        std::this_thread::sleep_for(1s);
-        mqtt->publish("PawnShop/cmd", "US");
-        std::this_thread::sleep_for(tus);
-        mqtt->publish("PawnShop/cmd", "USoff");
-        // mqtt.publish("PawnShop/cmd", "Empty");
-        rails->move({Xus, Yus, Ztop});
-        std::this_thread::sleep_for(1s);
+        washing();
 
         drying();
 
@@ -229,27 +199,55 @@ class Controller {
     }
 
     void getGold() {
-        rails->move({400.0, 500.0, 150.0});
-        rails->move({400.0, 500.0, 50.0});
-        rails->move({400.0, 500.0, 150.0});
+        const auto& reciever_coord = dev->gold_reciever->coordinate;
+        const Vec3D reciever_top_coord = {reciever_coord[0], reciever_coord[1],
+                                          dev->safe_height};
+
+        rails->move(reciever_top_coord);
+        rails->move(reciever_coord);
+        rails->move(reciever_top_coord);
     }
 
     void pressScalesButton() {
-        rails->move({400.0, 500.0, 150.0});
-        rails->move({400.0, 515.0, 150.0});
+        const auto& btn_coord = dev->scales->power_button->coordinate;
+        const Vec3D btn_offset_coord = {
+            btn_coord[0], dev->gold_reciever->coordinate[1], btn_coord[2]};
+
+        rails->move(btn_offset_coord);
+        rails->move(btn_coord);
         std::this_thread::sleep_for(1s);
-        rails->move({400.0, 500.0, 150.0});
+        rails->move(btn_offset_coord);
+        std::this_thread::sleep_for(1s);
+    }
+
+    void washing() {
+        const auto& usbath_coord = dev->ultrasonic_bath->coordinate;
+        const Vec3D usbath_top_coord = {usbath_coord[0], usbath_coord[1],
+                                        dev->safe_height};
+
+        rails->move(usbath_top_coord);
+        rails->move(usbath_coord);
+        std::this_thread::sleep_for(1s);
+        mqtt->publish("PawnShop/cmd", "US");
+        std::this_thread::sleep_for(dev->ultrasonic_bath->duration);
+        mqtt->publish("PawnShop/cmd", "USoff");
+        // mqtt.publish("PawnShop/cmd", "Empty");
+        rails->move(usbath_top_coord);
         std::this_thread::sleep_for(1s);
     }
 
     void drying() {
-        rails->move({Xdr, Ydr, Ztop});
-        rails->move({Xdr, Ydr, Zdr});
+        const auto& dryer_coord = dev->dryer->coordinate;
+        const Vec3D dryer_top_coord = {dryer_coord[0], dryer_coord[1],
+                                       dev->safe_height};
+
+        rails->move(dryer_top_coord);
+        rails->move(dryer_coord);
         mqtt->publish("PawnShop/cmd", "Dry");
-        std::this_thread::sleep_for(tdr);
+        std::this_thread::sleep_for(dev->dryer->duration);
         mqtt->publish("PawnShop/cmd", "SDry");
         std::this_thread::sleep_for(1s);
-        rails->move({Xdr, Ydr, Ztop});
+        rails->move(dryer_top_coord);
     }
 
     /**
@@ -258,10 +256,14 @@ class Controller {
      * @returns measured weight or 0 in case of failure
      */
     double scaleWeighting() {
-        rails->move({Xscl, Yscl, Ztop});
-        rails->move({Xscl, Yscl, Zscl});
+        const auto& scale_coord = dev->scales->coordinate;
+        const Vec3D scale_top_coord = {scale_coord[0], scale_coord[1],
+                                       dev->safe_height};
+
+        rails->move(scale_top_coord);
+        rails->move(scale_coord);
         auto weight = scales->getWeight();
-        rails->move({Xscl, Yscl, Ztop});
+        rails->move(scale_top_coord);
         return weight.value_or(0);
     }
 
@@ -271,36 +273,29 @@ class Controller {
      * @returns measured weight or 0 in case of failure
      */
     double submergedWeighting() {
-        rails->move({Xcup, Ycup, Ztop});
-        rails->move({Xcup, Ycup, Zcup});
+        const auto& cup_coord = dev->scales->cup->coordinate;
+        const Vec3D cup_top_coord = {cup_coord[0], cup_coord[1],
+                                     dev->safe_height};
+
+        rails->move(cup_top_coord);
+        rails->move(cup_coord);
         auto weight = scales->getWeight();
-        rails->move({Xcup, Ycup, Ztop});
+        rails->move(cup_top_coord);
         return weight.value_or(0);
     }
 
 public:
-    Controller(shared_ptr<Config> config,
-               shared_ptr<mqtt::async_client> mqtt,
+    Controller(shared_ptr<Config> config, shared_ptr<mqtt::async_client> mqtt,
                shared_ptr<MqttHandler::MessageQueue> incoming_messages,
                shared_ptr<atomic<bool>> interrupted)
         : mqtt(mqtt),
           incoming_messages(incoming_messages),
           interrupted(interrupted) {
+        scales = make_unique<Scales>(move(config->scales));
+        rails = make_unique<Rails>(move(config->rails));
+        dev = move(config->devices);
 
-        gpiod::chip gpio_chip{"/dev/gpiochip0"};
-        scales = make_unique<Scales>("/dev/ttyS0");
-        // const std::array stepSizeLineOffsets { 22, 27, 17 };
-        rails = make_unique<Rails>(array{
-            //   len    steps   v_min v_max  accel
-            Axis{435.0, 17250u, 30.0, 600.0, 100.0,
-                 //              cl  dir inverted
-                 Motor{gpio_chip, 06, 13, true}, LimitSwitch{gpio_chip, 25}},
-            Axis{530.0, 26750u, 30.0, 600.0, 100.0, Motor{gpio_chip, 20, 16},
-                 LimitSwitch{gpio_chip, 5}},
-            Axis{150.0, 94000u, 30.0, 600.0, 100.0,
-                 Motor{gpio_chip, 19, 26, true}, LimitSwitch{gpio_chip, 12}}});
-
-        db = make_unique<Db>("measurements.sqlite3");
+        db = make_unique<Db>(move(config->db));
 
         receiver = make_unique<thread>(&Controller::recieveMsg, this);
         state_cv = make_unique<condition_variable>();
@@ -336,11 +331,11 @@ int main(int argc, char** argv) {
 
     auto config = make_shared<Config>();
 
-    auto mqtt = make_shared<mqtt::async_client>("tcp://lombardmat.local:1883",
-                                                "controller");
+    auto mqtt = make_shared<mqtt::async_client>(config->mqtt->broker_url,
+                                                config->mqtt->client_id);
     auto mqtt_options = mqtt::connect_options_builder()
-                            .user_name("controller")
-                            .password("controller")
+                            .user_name(config->mqtt->username)
+                            .password(config->mqtt->password)
                             .finalize();
     auto incoming_messages = make_shared<MqttHandler::MessageQueue>();
     MqttHandler mqtt_handler(mqtt, mqtt_options, shutdown_requested,

@@ -42,6 +42,16 @@ void from_json(const nlohmann::json& j, Measurement& m) {
     j.at("density").get_to(m.density);
 }
 
+void to_json(nlohmann::json& j, const CalibrationInfo& i) {
+    j = {{"caret_weight", i.caret_weight},
+         {"caret_submerged_weight", i.caret_submerged_weight}};
+}
+
+void from_json(const nlohmann::json& j, CalibrationInfo& i) {
+    j.at("caret_weight").get_to(i.caret_weight);
+    j.at("caret_submerged_weight").get_to(i.caret_submerged_weight);
+}
+
 DbConfig::DbConfig(const toml::table& table) {
     path = table["path"].value<string>().value();
 }

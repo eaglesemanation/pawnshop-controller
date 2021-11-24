@@ -179,6 +179,9 @@ class Controller {
         m.id = db->insertMeasurement(m);
 
         json payload = m;
+        // FIXME: Include calibration info for debugging purpuses, should be
+        // removed
+        payload.update(calibration_info);
         mqtt->publish("PawnShop/report", payload.dump());
 
         drying();

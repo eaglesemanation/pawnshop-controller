@@ -33,6 +33,9 @@ struct CalibrationInfo {
     double caret_submerged_weight;
 };
 
+void to_json(nlohmann::json& j, const CalibrationInfo& p);
+void from_json(const nlohmann::json& j, CalibrationInfo& p);
+
 struct DbConfig {
     std::string path;
 

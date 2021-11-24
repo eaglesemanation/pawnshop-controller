@@ -112,7 +112,7 @@ class Controller {
 
         double baseline_weight = scales->getWeight().value_or(0);
 
-        calibration_info.caret_weight = scaleWeighting() - baseline_weight;
+        calibration_info.caret_weight = scaleWeighting(baseline_weight);
         if (prev_info) {
             if (abs(prev_info->caret_weight - calibration_info.caret_weight) /
                     prev_info->caret_weight >
@@ -124,7 +124,7 @@ class Controller {
         }
 
         calibration_info.caret_submerged_weight =
-            submergedWeighting() - baseline_weight;
+            submergedWeighting(baseline_weight);
         if (prev_info) {
             if (abs(prev_info->caret_submerged_weight -
                     calibration_info.caret_submerged_weight) /
@@ -160,28 +160,19 @@ class Controller {
 
         // permanent weight control while filling
         double baseline_weight = scales->getWeight().value_or(0);
-        const double desired_weight = 40;
-        if (baseline_weight < desired_weight) {
-            mqtt->publish("PawnShop/cmd",
-                          json{{"cmd", "FillCup"},
-                               {"Value", desired_weight - baseline_weight}}
-                              .dump());
-        }
-
         getGold();
 
         m.dirty_weight =
-            scaleWeighting() - calibration_info.caret_weight - baseline_weight;
+            scaleWeighting(baseline_weight) - calibration_info.caret_weight;
 
         washing();
 
         drying();
 
         m.clean_weight =
-            scaleWeighting() - calibration_info.caret_weight - baseline_weight;
-        m.submerged_weight = submergedWeighting() -
-                             calibration_info.caret_submerged_weight -
-                             baseline_weight;
+            scaleWeighting(baseline_weight) - calibration_info.caret_weight;
+        m.submerged_weight = submergedWeighting(baseline_weight) -
+                             calibration_info.caret_submerged_weight;
         m.density = m.clean_weight / m.submerged_weight;
 
         // id generated on insertion
@@ -257,7 +248,7 @@ class Controller {
      *
      * @returns measured weight or 0 in case of failure
      */
-    double scaleWeighting() {
+    double scaleWeighting(double baseline_weight) {
         const auto& scale_coord = dev->scales->coordinate;
         const Vec3D scale_top_coord = {scale_coord[0], scale_coord[1],
                                        dev->safe_height};
@@ -266,7 +257,7 @@ class Controller {
         rails->move(scale_coord);
         auto weight = scales->getWeight();
         rails->move(scale_top_coord);
-        return weight.value_or(0);
+        return weight.value_or(0) - baseline_weight;
     }
 
     /**
@@ -274,16 +265,24 @@ class Controller {
      *
      * @returns measured weight or 0 in case of failure
      */
-    double submergedWeighting() {
+    double submergedWeighting(double baseline_weight) {
         const auto& cup_coord = dev->scales->cup->coordinate;
         const Vec3D cup_top_coord = {cup_coord[0], cup_coord[1],
                                      dev->safe_height};
+
+        const double desired_weight = dev->scales->cup->desired_weight;
+        if (baseline_weight < desired_weight) {
+            mqtt->publish("PawnShop/cmd",
+                          json{{"cmd", "FillCup"},
+                               {"Value", desired_weight - baseline_weight}}
+                              .dump());
+        }
 
         rails->move(cup_top_coord);
         rails->move(cup_coord);
         auto weight = scales->getWeight();
         rails->move(cup_top_coord);
-        return weight.value_or(0);
+        return weight.value_or(0) - baseline_weight;
     }
 
 public:

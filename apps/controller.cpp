@@ -195,6 +195,7 @@ class Controller {
         state.store(MEASURING);
 
         Measurement m;
+        m.start_time = system_clock::now();
         m.product_id = product_id;
 
         mqtt->publish("PawnShop/cmd", "FillUS");
@@ -220,15 +221,6 @@ class Controller {
                              calibration_info.caret_submerged_weight;
         m.density = m.clean_weight / m.submerged_weight;
 
-        // id generated on insertion
-        m.id = db->insertMeasurement(m);
-
-        json payload = m;
-        // FIXME: Include calibration info for debugging purpuses, should be
-        // removed
-        payload.update(calibration_info);
-        mqtt->publish("PawnShop/report", payload.dump());
-
         drying();
 
         if (db->getMeasurementsAmount() % 10 == 0) {
@@ -237,6 +229,16 @@ class Controller {
 
         const auto& reciever_coord = dev->gold_reciever->coordinate;
         rails->move({reciever_coord[0], reciever_coord[1], dev->safe_height});
+
+        m.end_time = system_clock::now();
+        // id generated on insertion
+        m.id = db->insertMeasurement(m);
+
+        json payload = m;
+        // FIXME: Include calibration info for debugging purpuses, should be
+        // removed
+        payload.update(calibration_info);
+        mqtt->publish("PawnShop/report", payload.dump());
 
         state.store(IDLE);
     }

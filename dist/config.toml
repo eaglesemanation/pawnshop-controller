@@ -9,6 +9,7 @@ path = './measurements.sqlite3'
 
 [scales]
 uart_path = '/dev/ttyS0'
+sample_size = 20
 
 
 [rails]

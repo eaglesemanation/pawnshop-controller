@@ -13,11 +13,10 @@ namespace pawnshop {
 
 ScalesConfig::ScalesConfig(const toml::table& table) {
     uart_path = table["uart_path"].value<string>().value();
+    sample_size = table["sample_size"].value<size_t>().value_or(20);
 }
 
-Scales::Scales(const std::string serial_path) : serial_path(serial_path) {}
-
-Scales::Scales(const unique_ptr<ScalesConfig> conf) : Scales{conf->uart_path} {}
+Scales::Scales(unique_ptr<const ScalesConfig> conf) : conf{move(conf)} {}
 
 Scales::~Scales() {}
 
@@ -49,8 +48,9 @@ std::optional<Scales::State> Scales::parse(const std::string line) {
 }
 
 std::optional<double> Scales::getWeight() {
-    std::ifstream serial(serial_path);
-    std::array<double, 20> measurements;
+    std::ifstream serial(conf->uart_path);
+    std::vector<double> measurements;
+    measurements.resize(conf->sample_size);
     auto measurements_iter = measurements.begin();
     while (true) {
         std::chrono::seconds timeout(10);
@@ -62,20 +62,19 @@ std::optional<double> Scales::getWeight() {
         if (state) {
             if (state->stable) {
                 *measurements_iter++ = state->weight;
+            } else {
+                measurements_iter = measurements.begin();
             }
         }
         if (measurements_iter == measurements.end()) {
             std::sort(measurements.begin(), measurements.end());
-            const size_t offset = measurements.size() / 4;
-            return std::accumulate(measurements.begin() + offset,
-                                   measurements.end() - offset, 0.0) /
-                   (offset * 2);
+            return measurements[measurements.size() / 2];
         }
     }
 }
 
 bool Scales::poweredOn(std::chrono::duration<int> timeout) {
-    std::ifstream serial(serial_path);
+    std::ifstream serial(conf->uart_path);
     auto line = getline_timeout(serial, timeout);
     return line.has_value();
 }

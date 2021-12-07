@@ -328,7 +328,7 @@ class Controller {
         if (baseline_weight < desired_weight) {
             mqtt->publish("PawnShop/cmd",
                           json{{"cmd", "FillCup"},
-                               {"Value", desired_weight - baseline_weight}}
+                               {"value", desired_weight - baseline_weight}}
                               .dump());
             this_thread::sleep_for(1s);
             baseline_weight = scales->getWeight().value_or(0);

@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -323,6 +324,8 @@ class Controller {
         const auto& cup_coord = dev->scales->cup->coordinate;
         const Vec3D cup_top_coord = {cup_coord[0], cup_coord[1],
                                      dev->safe_height};
+        const Vec3D cup_bottom_coord = {cup_coord[0], cup_coord[1],
+                                        max(cup_coord[2] - 10.0, 0.0)};
 
         const double desired_weight = dev->scales->cup->desired_weight;
         if (baseline_weight < desired_weight) {
@@ -335,6 +338,7 @@ class Controller {
         }
 
         rails->move(cup_top_coord);
+        rails->move(cup_bottom_coord);
         rails->move(cup_coord);
         auto weight = scales->getWeight();
         rails->move(cup_top_coord);
